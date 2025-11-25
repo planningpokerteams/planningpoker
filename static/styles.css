@@ -1,0 +1,423 @@
+/* Reset léger & base */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+                 Roboto, Helvetica, Arial, sans-serif;
+    color: #111827;
+}
+
+/* Fond général façon app moderne */
+.landing-body {
+    min-height: 100vh;
+    background: linear-gradient(180deg, #f9fafb 0%, #e5e7eb 40%, #eef2ff 100%);
+}
+
+/* ------------------------------
+   Navbar
+   ------------------------------ */
+.navbar {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background-color: #ffffff;
+    border-bottom: 1px solid #e5e7eb;
+    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.04);
+}
+
+.nav-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+}
+
+.logo {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: 1.15rem;
+    letter-spacing: 0.02em;
+    color: #111827;
+}
+
+.logo-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 999px;
+    background: radial-gradient(circle at 30% 30%, #4f46e5, #7c3aed);
+    color: #ffffff;
+    font-size: 0.9rem;
+}
+
+.logo-text {
+    margin-top: 1px;
+}
+
+.nav-links {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 0.95rem;
+}
+
+.nav-links a {
+    text-decoration: none;
+    color: #4b5563;
+    padding: 6px 4px;
+    border-radius: 999px;
+    transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+.nav-links a:hover {
+    color: #111827;
+    background-color: #eef2ff;
+}
+
+.nav-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* ------------------------------
+   Boutons
+   ------------------------------ */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    padding: 8px 16px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    text-decoration: none;
+    transition: transform 0.12s ease, box-shadow 0.12s ease, background-color 0.12s ease, color 0.12s ease;
+    white-space: nowrap;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #4f46e5, #6366f1);
+    color: #ffffff;
+    box-shadow: 0 10px 25px rgba(79, 70, 229, 0.35);
+}
+
+.btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 14px 30px rgba(79, 70, 229, 0.45);
+    background: linear-gradient(135deg, #4338ca, #4f46e5);
+}
+
+.btn-ghost {
+    background-color: transparent;
+    color: #4b5563;
+    border: 1px solid #d1d5db;
+}
+
+.btn-ghost:hover {
+    background-color: #f3f4f6;
+    color: #111827;
+}
+
+.btn-lg {
+    padding: 11px 22px;
+    font-size: 1rem;
+}
+
+.full-width {
+    width: 100%;
+}
+
+/* ------------------------------
+   Hero
+   ------------------------------ */
+.hero {
+    padding: 72px 16px 96px;
+}
+
+.hero-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 48px;
+    flex-wrap: wrap;
+}
+
+.hero-text {
+    flex: 1 1 340px;
+    min-width: 280px;
+}
+
+.hero-text h1 {
+    font-size: clamp(2.1rem, 3vw, 2.7rem);
+    line-height: 1.1;
+    margin: 0 0 14px;
+    letter-spacing: -0.03em;
+}
+
+.hero-subtitle {
+    margin: 0 0 24px;
+    font-size: 1rem;
+    color: #4b5563;
+    max-width: 420px;
+}
+
+.hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.hero-small {
+    font-size: 0.85rem;
+    color: #6b7280;
+}
+
+.hero-card {
+    flex: 1 1 320px;
+    min-width: 280px;
+    display: flex;
+    justify-content: center;
+}
+
+/* ------------------------------
+   Carte de session
+   ------------------------------ */
+.session-card {
+    width: 100%;
+    max-width: 360px;
+    background-color: #ffffff;
+    border-radius: 18px;
+    box-shadow: 0 22px 50px rgba(15, 23, 42, 0.18);
+    padding: 22px 22px 26px;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.session-card h2 {
+    margin: 0 0 18px;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #111827;
+}
+
+.session-card label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 0.85rem;
+    color: #6b7280;
+}
+
+.session-card input,
+.session-card select {
+    width: 100%;
+    padding: 9px 11px;
+    border-radius: 10px;
+    border: 1px solid #d1d5db;
+    font-size: 0.95rem;
+    outline: none;
+    background-color: #f9fafb;
+    margin-bottom: 12px;
+    transition: border-color 0.12s ease, box-shadow 0.12s ease, background-color 0.12s ease;
+}
+
+.session-card input:focus,
+.session-card select:focus {
+    border-color: #4f46e5;
+    box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.3);
+    background-color: #ffffff;
+}
+
+.session-hint {
+    margin-top: 10px;
+    font-size: 0.85rem;
+    color: #6b7280;
+    text-align: center;
+}
+
+.session-hint a {
+    color: #4f46e5;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.session-hint a:hover {
+    text-decoration: underline;
+}
+
+/* ------------------------------
+   Sections secondaires
+   ------------------------------ */
+.features,
+.steps,
+.about {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 40px 16px 0;
+}
+
+.features h2,
+.steps h2 {
+    font-size: 1.3rem;
+    margin-bottom: 18px;
+}
+
+.features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 18px;
+}
+
+.feature-card {
+    background-color: rgba(255, 255, 255, 0.7);
+    border-radius: 14px;
+    padding: 16px 18px;
+    border: 1px solid rgba(209, 213, 219, 0.7);
+    box-shadow: 0 10px 25px rgba(15, 23, 42, 0.06);
+}
+
+.feature-card h3 {
+    margin: 0 0 6px;
+    font-size: 1rem;
+}
+
+.feature-card p {
+    margin: 0;
+    font-size: 0.9rem;
+    color: #4b5563;
+}
+
+.steps-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    gap: 10px;
+    font-size: 0.95rem;
+    color: #374151;
+}
+
+.steps-list li {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.steps-list span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 22px;
+    font-size: 0.8rem;
+    border-radius: 999px;
+    background-color: #eef2ff;
+    color: #4f46e5;
+    font-weight: 600;
+}
+
+.about {
+    padding-bottom: 40px;
+    font-size: 0.9rem;
+    color: #6b7280;
+}
+
+/* ------------------------------
+   Responsive
+   ------------------------------ */
+@media (max-width: 768px) {
+    .nav-inner {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 10px 16px;
+    }
+
+    .nav-links {
+        display: none; /* pour simplifier sur mobile */
+    }
+
+    .hero {
+        padding-top: 50px;
+    }
+
+    .hero-inner {
+        gap: 32px;
+    }
+
+    .session-card {
+        max-width: 380px;
+    }
+}
+
+.avatar-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  
+  .avatar-option {
+    cursor: pointer;
+    border-radius: 999px;
+    padding: 4px;
+    border: 2px solid transparent;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  }
+  
+  .avatar-option input {
+    display: none; /* on masque le radio natif */
+  }
+  
+  .avatar-option img {
+    width: 40px;
+    height: 40px;
+    border-radius: 999px;
+    display: block;
+    border: 2px solid transparent;
+  }
+  
+  /* état sélectionné : radio coché */
+  .avatar-option input:checked + img {
+    border-color: #7852ff;
+    box-shadow: 0 0 0 2px rgba(120, 82, 255, 0.4);
+    transform: translateY(-1px);
+  }
+  
+  /* petit effet au survol, en plus du checked */
+  .avatar-option:hover img {
+    box-shadow: 0 0 0 2px rgba(120, 82, 255, 0.3);
+  }
+  
+  .participant-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 4px 0;
+  }
+  
+  .avatar-icon {
+    width: 36px;   /* plus petit que le gros cercle */
+    height: 36px;
+    border-radius: 999px;
+    object-fit: cover;
+  }
+  

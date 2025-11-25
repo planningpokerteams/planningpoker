@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Rejoindre une session</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body class="landing-body">
+
+    <!-- NAVBAR -->
+    <header class="navbar">
+        <div class="nav-inner">
+            <div class="logo">
+                <span class="logo-mark">♠</span>
+                <span class="logo-text">Poker Planning</span>
+            </div>
+
+            <nav class="nav-links">
+                <a href="/">Accueil</a>
+                <a href="/create">Créer une session</a>
+                <a href="/join" class="active">Rejoindre</a>
+            </nav>
+
+            <div class="nav-actions">
+                <a href="/join" class="btn btn-ghost">Rejoindre</a>
+                <a href="/create" class="btn btn-primary">Nouvelle session</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- CONTENU PRINCIPAL -->
+    <main class="hero">
+        <div class="hero-inner">
+            <!-- Texte gauche -->
+            <section class="hero-text">
+                <h1>Rejoindre une session</h1>
+                <p class="hero-subtitle">
+                    Entre le code de session partagé par ton équipe
+                    et rejoins la partie de planning poker.
+                </p>
+                <p class="hero-small">
+                    Tu apparaîtras dans la salle d’attente avec ton pseudo et ton avatar.
+                </p>
+            </section>
+
+            <!-- Carte formulaire -->
+            <section class="hero-card">
+                <div class="session-card">
+                    <h2>Informations de connexion</h2>
+
+                    <form method="post">
+                        <!-- CODE SESSION -->
+                        <div class="form-group">
+                            <label for="code">Code de session</label>
+                            <input
+                                id="code"
+                                type="text"
+                                name="code"
+                                required
+                                placeholder="Ex : 3F9KQZ"
+                            >
+                        </div>
+
+                        <!-- PSEUDO -->
+                        <div class="form-group">
+                            <label for="name">Votre pseudo</label>
+                            <input
+                                id="name"
+                                type="text"
+                                name="name"
+                                required
+                                placeholder="Ton pseudo"
+                            >
+                        </div>
+
+                        <!-- CHOIX AVATAR -->
+                        <div class="form-group">
+                            <label>Choisis ton avatar</label>
+                            <p class="hero-small" style="margin-bottom: 6px;">
+                                Il te permettra d’être facilement reconnaissable par ton équipe.
+                            </p>
+
+                            <div class="avatar-grid">
+                                {% for seed in avatars %}
+                                    <label class="avatar-option">
+                                        <input
+                                            type="radio"
+                                            name="avatar_seed"
+                                            value="{{ seed }}"
+                                            {% if loop.first %}checked{% endif %}
+                                        >
+                                        <img
+                                            src="https://api.dicebear.com/9.x/avataaars/svg?seed={{ seed }}&backgroundColor=b6e3f4&radius=50"
+                                            alt="avatar {{ seed }}"
+                                        >
+                                    </label>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- BOUTON SUBMIT -->
+                        <button
+                            type="submit"
+                            class="btn btn-primary full-width"
+                            style="margin-top: 16px;"
+                        >
+                            Rejoindre la session
+                        </button>
+                    </form>
+                </div>
+            </section>
+        </div>
+    </main>
+
+</body>
+</html>

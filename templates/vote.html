@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Vote</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+
+<body class="landing-body">
+    <!-- NAVBAR identique aux autres pages -->
+    <header class="navbar">
+        <div class="nav-inner">
+            <div class="logo">
+                <span class="logo-mark">♠</span>
+                <span class="logo-text">Poker Planning</span>
+            </div>
+
+            <nav class="nav-links">
+                <a href="/">Accueil</a>
+                <a href="/create">Créer une session</a>
+                <a href="/join">Rejoindre</a>
+            </nav>
+
+            <div class="nav-actions">
+                <a href="/join" class="btn btn-ghost">Rejoindre</a>
+                <a href="/create" class="btn btn-primary">Nouvelle session</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- CONTENU PRINCIPAL -->
+    <main class="hero">
+        <div class="hero-inner">
+            <!-- Texte à gauche -->
+            <section class="hero-text">
+                <h1>Phase de vote</h1>
+                <p class="hero-subtitle">
+                    Choisis une valeur pour estimer la complexité de la user story en cours.
+                    Tous les votes seront révélés une fois que tout le monde aura voté.
+                </p>
+
+                <h3>User stories de la session :</h3>
+                <ul>
+                    {% for story in session.userStories %}
+                        <li>{{ story }}</li>
+                    {% endfor %}
+                </ul>
+            </section>
+
+            <!-- Carte de vote à droite -->
+            <section class="hero-card">
+                <div class="session-card">
+                    <h2>Votre vote</h2>
+
+                    <form method="post">
+                        <label for="vote">Sélectionner une carte</label>
+                        <select id="vote" name="vote" required>
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="5">5</option>
+                            <option value="8">8</option>
+                            <option value="13">13</option>
+                        </select>
+
+                        <button
+                            type="submit"
+                            class="btn btn-primary full-width"
+                            style="margin-top: 10px;"
+                        >
+                            Voter
+                        </button>
+                    </form>
+
+                    <h3 style="margin-top: 18px;">Votes actuels</h3>
+                    <ul>
+                        {% for p in participants %}
+                            <li class="participant-item">
+                                <img
+                                    class="avatar-icon"
+                                    src="https://api.dicebear.com/9.x/avataaars/svg?seed={{ p.avatarSeed or 'astronaut' }}&backgroundColor=b6e3f4&radius=50"
+                                    alt="avatar de {{ p.name }}"
+                                >
+                                <span>{{ p.name }} : {{ p.vote or '—' }}</span>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </section>
+        </div>
+    </main>
+</body>
+</html>

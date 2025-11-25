@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Créer une session</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body class="landing-body">
+
+    <!-- NAVBAR -->
+    <header class="navbar">
+        <div class="nav-inner">
+            <div class="logo">
+                <span class="logo-mark">♠</span>
+                <span class="logo-text">Poker Planning</span>
+            </div>
+
+            <nav class="nav-links">
+                <a href="/">Accueil</a>
+                <a href="/create" class="active">Créer une session</a>
+                <a href="/join">Rejoindre</a>
+            </nav>
+
+            <div class="nav-actions">
+                <a href="/join" class="btn btn-ghost">Rejoindre</a>
+                <a href="/create" class="btn btn-primary">Nouvelle session</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- CONTENU PRINCIPAL -->
+    <main class="hero">
+        <div class="hero-inner">
+            <!-- Texte gauche -->
+            <section class="hero-text">
+                <h1>Créer une nouvelle session</h1>
+                <p class="hero-subtitle">
+                    Configure ta partie de planning poker et invite ton équipe
+                    pour estimer vos user stories.
+                </p>
+                <p class="hero-small">
+                    Remplis les informations ci-contre puis partage le code ou le lien généré.
+                </p>
+            </section>
+
+            <!-- Carte formulaire -->
+            <section class="hero-card">
+                <div class="session-card">
+                    <h2>Paramètres de la session</h2>
+
+                    <form method="post">
+                        <!-- PSEUDO -->
+                        <div class="form-group">
+                            <label for="organizer">Votre pseudo</label>
+                            <input
+                                id="organizer"
+                                type="text"
+                                name="organizer"
+                                required
+                                placeholder="Ton pseudo"
+                            >
+                        </div>
+
+                        <!-- DIFFICULTÉ -->
+                        <div class="form-group">
+                            <label for="difficulty">Niveau de difficulté</label>
+                            <select id="difficulty" name="difficulty" required>
+                                <option value="Facile">Facile</option>
+                                <option value="Moyen">Moyen</option>
+                                <option value="Difficile">Difficile</option>
+                            </select>
+                        </div>
+
+                        <!-- NOMBRE DE TOURS -->
+                        <div class="form-group">
+                            <label for="rounds">Nombre de tours</label>
+                            <input
+                                id="rounds"
+                                type="number"
+                                name="rounds"
+                                min="1"
+                                value="4"
+                                required
+                            >
+                        </div>
+
+                        <!-- USER STORIES -->
+                        <div class="form-group">
+                            <label for="userStories">User stories à estimer</label>
+                            <input
+                                id="userStories"
+                                type="text"
+                                name="userStories"
+                                placeholder="Ex : En tant qu’utilisateur, je veux..."
+                            >
+                            <!-- si tu as un JS pour ajouter plusieurs stories, garde ton bouton ici -->
+                            <button
+                                type="button"
+                                class="btn btn-ghost full-width"
+                                id="add-story-btn"
+                                style="margin-top: 8px;"
+                            >
+                                + Ajouter une User Story
+                            </button>
+                            <div id="stories-container"></div>
+                        </div>
+
+                        <!-- CHOIX DE L'AVATAR -->
+                        <div class="form-group avatar-group">
+                            <label>Choisis ton avatar</label>
+                            <p class="hero-small" style="margin-bottom: 6px;">
+                                Cet avatar sera utilisé dans la salle d’attente et lors du vote.
+                            </p>
+
+                            <div class="avatar-grid">
+                                {% for seed in avatars %}
+                                    <label class="avatar-option">
+                                        <input
+                                            type="radio"
+                                            name="avatar_seed"
+                                            value="{{ seed }}"
+                                            {% if loop.first %}checked{% endif %}
+                                        >
+                                        <img
+                                            src="https://api.dicebear.com/9.x/avataaars/svg?seed={{ seed }}&backgroundColor=b6e3f4&radius=50"
+                                            alt="avatar {{ seed }}"
+                                        >
+                                    </label>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+
+                        <!-- BOUTON SUBMIT -->
+                        <button
+                            type="submit"
+                            class="btn btn-primary full-width"
+                            style="margin-top: 16px;"
+                        >
+                            Créer la session
+                        </button>
+                    </form>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Optionnel : petit JS pour dupliquer les user stories -->
+    <script>
+        const addBtn = document.getElementById('add-story-btn');
+        const container = document.getElementById('stories-container');
+        const firstInput = document.getElementById('userStories');
+
+        if (addBtn && container && firstInput) {
+            addBtn.addEventListener('click', () => {
+                const value = firstInput.value.trim();
+                if (!value) return;
+
+                // créer un input caché pour soumettre plusieurs userStories
+                const hidden = document.createElement('input');
+                hidden.type = 'hidden';
+                hidden.name = 'userStories';
+                hidden.value = value;
+                container.appendChild(hidden);
+
+                // feedback visuel (liste)
+                const tag = document.createElement('div');
+                tag.textContent = value;
+                tag.className = 'story-tag';
+                container.appendChild(tag);
+
+                firstInput.value = '';
+            });
+        }
+    </script>
+
+</body>
+</html>

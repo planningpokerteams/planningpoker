@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Salle d'attente</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+
+<body class="landing-body">
+
+    <!-- NAVBAR identique -->
+    <header class="navbar">
+        <div class="nav-inner">
+            <div class="logo">
+                <span class="logo-mark">♠</span>
+                <span class="logo-text">Poker Planning</span>
+            </div>
+
+            <nav class="nav-links">
+                <a href="/">Accueil</a>
+                <a href="/create">Créer une session</a>
+                <a href="/join">Rejoindre</a>
+            </nav>
+
+            <div class="nav-actions">
+                <a href="/join" class="btn btn-ghost">Rejoindre</a>
+                <a href="/create" class="btn btn-primary">Nouvelle session</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- CONTENU PRINCIPAL -->
+    <main class="hero">
+        <div class="hero-inner">
+
+            <!-- Texte de gauche -->
+            <section class="hero-text">
+                <h1>Salle d'attente</h1>
+                <p class="hero-subtitle">
+                    En attente des derniers participants…  
+                    Le Scrum Master démarre la session quand tout le monde est présent.
+                </p>
+
+                <p class="hero-small">
+                    Partage ce code pour inviter ton équipe :
+                </p>
+
+                <h2 style="font-size: 2rem; margin-top: 6px; letter-spacing: 3px;">
+                    {{ session_id }}
+                </h2>
+            </section>
+
+            <!-- Carte participants -->
+            <section class="hero-card">
+                <div class="session-card">
+                    <h2>Participants</h2>
+
+                    <ul id="participants-list">
+                        {% for p in participants %}
+                            <li class="participant-item">
+                                <img
+                                    class="avatar-icon"
+                                    src="https://api.dicebear.com/9.x/avataaars/svg?seed={{ p.avatarSeed or 'astronaut' }}&backgroundColor=b6e3f4&radius=50"
+                                    alt="avatar {{ p.name }}"
+                                >
+                                <span>{{ p.name }}</span>
+                            </li>
+                        {% endfor %}
+                    </ul>
+
+                    {% if session.organizer == current_user %}
+                        <form
+                          method="post"
+                          action="{{ url_for('start', session_id=session_id) }}"
+                          style="margin-top: 15px;"
+                        >
+                            <button type="submit" class="btn btn-primary full-width">
+                                Lancer la partie
+                            </button>
+                        </form>
+                    {% else %}
+                        <p class="hero-small" style="margin-top: 12px;">
+                            En attente que l’organisateur démarre…
+                        </p>
+                    {% endif %}
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <!-- Rafraîchissement auto des participants -->
+    <script>
+        const sessionId = "{{ session_id }}";
+
+        function refreshParticipants() {
+          fetch(`/api/participants/${sessionId}`)
+            .then(response => response.json())
+            .then(data => {
+              const ul = document.getElementById('participants-list');
+              ul.innerHTML = ""; // on vide la liste
+
+              data.participants.forEach(p => {
+                const li = document.createElement('li');
+                li.className = 'participant-item';
+
+                const img = document.createElement('img');
+                img.className = 'avatar-icon';
+                img.src = `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(p.avatarSeed || 'astronaut')}&backgroundColor=b6e3f4&radius=50`;
+                img.alt = `avatar ${p.name}`;
+
+                const span = document.createElement('span');
+                span.textContent = p.name;
+
+                li.appendChild(img);
+                li.appendChild(span);
+                ul.appendChild(li);
+              });
+            })
+            .catch(err => {
+              console.error("Erreur lors du rafraîchissement des participants", err);
+            });
+        }
+
+        refreshParticipants();
+        setInterval(refreshParticipants, 3000);
+    </script>
+
+</body>
+</html>

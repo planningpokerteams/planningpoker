@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Poker Planning</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+
+<body class="landing-body">
+
+    <!-- NAVBAR -->
+    <header class="navbar">
+        <div class="nav-inner">
+            <div class="logo">
+                <span class="logo-mark">♠</span>
+                <span class="logo-text">Poker Planning</span>
+            </div>
+
+            <nav class="nav-links">
+                <a href="#features">Fonctionnalités</a>
+                <a href="#how-it-works">Comment ça marche ?</a>
+                <a href="#about">À propos</a>
+            </nav>
+
+            <div class="nav-actions">
+                <a href="/join" class="btn btn-ghost">Rejoindre</a>
+                <a href="/create" class="btn btn-primary">Nouvelle session</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- HERO -->
+    <main class="hero">
+        <div class="hero-inner">
+
+            <!-- Texte principal -->
+            <section class="hero-text">
+                <h1>Planning poker en ligne pour ton équipe agile</h1>
+                <p class="hero-subtitle">
+                    Lance une session, invite ton équipe et estimez vos user stories ensemble.
+                </p>
+
+                <div class="hero-actions">
+                    <a href="/create" class="btn btn-primary btn-lg">Créer une session</a>
+                    <a href="/join" class="btn btn-ghost btn-lg">Rejoindre une session</a>
+                </div>
+
+                <p class="hero-small">
+                    Aucune inscription • Temps réel • Gratuit
+                </p>
+            </section>
+
+        </div>
+
+        <!-- SECTIONS -->
+        <section id="features" class="features">
+            <h2>Pensé pour les équipes agiles</h2>
+
+            <div class="features-grid">
+                <article class="feature-card">
+                    <h3>Simple et rapide</h3>
+                    <p>Crée une session en quelques secondes.</p>
+                </article>
+
+                <article class="feature-card">
+                    <h3>Collaboration instantanée</h3>
+                    <p>Votez en temps réel, résultat automatique.</p>
+                </article>
+
+                <article class="feature-card">
+                    <h3>Decks personnalisés</h3>
+                    <p>Fibonacci, T-shirt, Powers of 2…</p>
+                </article>
+            </div>
+        </section>
+
+        <section id="how-it-works" class="steps">
+            <h2>Comment ça marche ?</h2>
+            <ol class="steps-list">
+                <li><span>1.</span> Crée une nouvelle session.</li>
+                <li><span>2.</span> Partage le lien avec ton équipe.</li>
+                <li><span>3.</span> Votez ensemble, facilement.</li>
+            </ol>
+        </section>
+
+        <section id="about" class="about">
+            <p>
+                Poker Planning est un outil moderne et léger pour faciliter vos estimations d’équipe.
+            </p>
+        </section>
+    </main>
+
+</body>
+</html>
