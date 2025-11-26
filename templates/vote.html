@@ -2,12 +2,12 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Vote</title>
+    <title>Phase de jeu</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 
 <body class="landing-body">
-    <!-- NAVBAR identique aux autres pages -->
+    <!-- NAVBAR -->
     <header class="navbar">
         <div class="nav-inner">
             <div class="logo">
@@ -28,66 +28,210 @@
         </div>
     </header>
 
-    <!-- CONTENU PRINCIPAL -->
+    <!-- TABLE DE JEU -->
     <main class="hero">
-        <div class="hero-inner">
-            <!-- Texte à gauche -->
-            <section class="hero-text">
-                <h1>Phase de vote</h1>
-                <p class="hero-subtitle">
-                    Choisis une valeur pour estimer la complexité de la user story en cours.
-                    Tous les votes seront révélés une fois que tout le monde aura voté.
+        <div class="hero-inner game-layout">
+            <!-- Zone de jeu / cartes -->
+            <section class="hero-card game-table">
+                <h1>Estimation en cours</h1>
+                <p class="hero-subtitle" id="story-text">
+                    Chargement de la user story…
                 </p>
 
-                <h3>User stories de la session :</h3>
-                <ul>
-                    {% for story in session.userStories %}
-                        <li>{{ story }}</li>
+                <!-- Cartes de vote -->
+                <form id="vote-form" method="post">
+                    <input type="hidden" name="vote" id="vote-input">
+
+                    <div class="cards-row">
+                        {% for value in [1, 2, 3, 5, 8, 13] %}
+                        <button
+                            type="button"
+                            class="poker-card"
+                            data-value="{{ value }}"
+                        >
+                            {{ value }}
+                        </button>
+                        {% endfor %}
+                    </div>
+                </form>
+
+                <p id="vote-status" class="hero-small" style="margin-top: 10px;">
+                    Clique sur une carte pour voter.
+                </p>
+
+                {% if is_organizer %}
+                <form id="reveal-form" method="post" action="{{ url_for('reveal', session_id=session_id) }}" style="margin-top: 18px;">
+                    <input type="hidden" name="username" value="{{ current_user }}">
+                    <button
+                        type="submit"
+                        id="reveal-button"
+                        class="btn btn-primary full-width"
+                        disabled
+                    >
+                        Révéler les cartes
+                    </button>
+                </form>
+                <p class="hero-small" id="reveal-hint" style="margin-top: 6px;">
+                    Le bouton se débloque quand tout le monde a voté.
+                </p>
+                {% else %}
+                <p class="hero-small" style="margin-top: 18px;">
+                    En attente que l’organisateur révèle les cartes…
+                </p>
+                {% endif %}
+            </section>
+
+            <!-- Table des joueurs -->
+            <section class="hero-card players-card">
+                <h2>Table de jeu</h2>
+                <ul id="players-table">
+                    {% for p in participants %}
+                    <li class="player-slot">
+                        <img
+                            class="avatar-icon"
+                            src="https://api.dicebear.com/9.x/avataaars/svg?seed={{ p.avatarSeed or 'astronaut' }}&backgroundColor=b6e3f4&radius=50"
+                            alt="avatar de {{ p.name }}"
+                        >
+                        <div class="player-info">
+                            <span class="player-name">{{ p.name }}</span>
+                            <span class="player-vote">
+                                {% if p.vote is none %}
+                                    ⏳ En attente
+                                {% else %}
+                                    ✅ A voté
+                                {% endif %}
+                            </span>
+                        </div>
+                    </li>
                     {% endfor %}
                 </ul>
             </section>
-
-            <!-- Carte de vote à droite -->
-            <section class="hero-card">
-                <div class="session-card">
-                    <h2>Votre vote</h2>
-
-                    <form method="post">
-                        <label for="vote">Sélectionner une carte</label>
-                        <select id="vote" name="vote" required>
-                            <option value="1">1</option>
-                            <option value="2">2</option>
-                            <option value="3">3</option>
-                            <option value="5">5</option>
-                            <option value="8">8</option>
-                            <option value="13">13</option>
-                        </select>
-
-                        <button
-                            type="submit"
-                            class="btn btn-primary full-width"
-                            style="margin-top: 10px;"
-                        >
-                            Voter
-                        </button>
-                    </form>
-
-                    <h3 style="margin-top: 18px;">Votes actuels</h3>
-                    <ul>
-                        {% for p in participants %}
-                            <li class="participant-item">
-                                <img
-                                    class="avatar-icon"
-                                    src="https://api.dicebear.com/9.x/avataaars/svg?seed={{ p.avatarSeed or 'astronaut' }}&backgroundColor=b6e3f4&radius=50"
-                                    alt="avatar de {{ p.name }}"
-                                >
-                                <span>{{ p.name }} : {{ p.vote or '—' }}</span>
-                            </li>
-                        {% endfor %}
-                    </ul>
-                </div>
-            </section>
         </div>
     </main>
+
+    <script>
+        const sessionId   = "{{ session_id }}";
+        const currentUser = "{{ current_user }}";
+        const isOrganizer = "{{ is_organizer }}".toLowerCase() === "true";
+        const cards         = document.querySelectorAll('.poker-card');
+        const voteInput     = document.getElementById('vote-input');
+        const voteForm      = document.getElementById('vote-form');
+        const voteStatusEl  = document.getElementById('vote-status');
+        const playersTable  = document.getElementById('players-table');
+        const storyTextEl   = document.getElementById('story-text');
+        const revealButton  = document.getElementById('reveal-button');
+        const revealHint    = document.getElementById('reveal-hint');
+
+        // --- Sélection de carte ---
+        cards.forEach(card => {
+            card.addEventListener('click', () => {
+                const value = card.getAttribute('data-value');
+                voteInput.value = value;
+
+                // Visuel : on marque la carte sélectionnée
+                cards.forEach(c => c.classList.remove('poker-card--selected'));
+                card.classList.add('poker-card--selected');
+
+                voteStatusEl.textContent = `Tu as choisi la carte ${value}. Vote envoyé…`;
+                voteForm.submit();
+            });
+        });
+
+        // --- Rafraîchissement régulier de l'état de jeu ---
+        function refreshGameState() {
+            fetch(`/api/game/${sessionId}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.error) {
+                        console.error("Erreur API game:", data.error);
+                        return;
+                    }
+
+                    // 1. Met à jour la user story
+                    if (storyTextEl) {
+                        storyTextEl.textContent = data.currentStory || "Aucune user story.";
+                    }
+
+                    // 2. Met à jour la table des joueurs
+                    playersTable.innerHTML = "";
+                    let meHasVoted = false;
+
+                    (data.participants || []).forEach(p => {
+                        const li = document.createElement('li');
+                        li.className = "player-slot";
+
+                        const img = document.createElement('img');
+                        img.className = "avatar-icon";
+                        img.src = `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(p.avatarSeed || 'astronaut')}&backgroundColor=b6e3f4&radius=50`;
+                        img.alt = `avatar de ${p.name}`;
+
+                        const info = document.createElement('div');
+                        info.className = "player-info";
+
+                        const nameSpan = document.createElement('span');
+                        nameSpan.className = "player-name";
+                        nameSpan.textContent = p.name;
+
+                        const voteSpan = document.createElement('span');
+                        voteSpan.className = "player-vote";
+
+                        if (!data.reveal) {
+                            // Avant révélation : on ne montre pas les valeurs
+                            voteSpan.textContent = p.hasVoted ? "✅ A voté" : "⏳ En attente";
+                        } else {
+                            // Après révélation : on montre les valeurs
+                            if (p.vote !== null && p.vote !== undefined) {
+                                voteSpan.textContent = `🃏 ${p.vote}`;
+                            } else {
+                                voteSpan.textContent = "—";
+                            }
+                        }
+
+                        info.appendChild(nameSpan);
+                        info.appendChild(voteSpan);
+                        li.appendChild(img);
+                        li.appendChild(info);
+                        playersTable.appendChild(li);
+
+                        if (p.name === currentUser && p.hasVoted) {
+                            meHasVoted = true;
+                        }
+                    });
+
+                    // 3. Texte de statut utilisateur
+                    if (!data.reveal) {
+                        if (meHasVoted) {
+                            voteStatusEl.textContent = "Ton vote est pris en compte. En attente des autres joueurs…";
+                        } else {
+                            voteStatusEl.textContent = "Clique sur une carte pour voter.";
+                        }
+                    } else {
+                        voteStatusEl.textContent = "Les cartes ont été révélées.";
+                    }
+
+                    // 4. Gestion du bouton Révéler (organisateur uniquement)
+                    if (isOrganizer && revealButton) {
+                        if (data.reveal) {
+                            revealButton.disabled = true;
+                            if (revealHint) revealHint.textContent = "Les cartes sont révélées.";
+                        } else {
+                            // On n’active le bouton que si tout le monde a voté
+                            revealButton.disabled = !data.allVoted;
+                            if (revealHint) {
+                                revealHint.textContent = data.allVoted
+                                    ? "Tout le monde a voté, tu peux révéler les cartes."
+                                    : "Le bouton se débloque quand tout le monde a voté.";
+                            }
+                        }
+                    }
+                })
+                .catch(err => {
+                    console.error("Erreur lors du rafraîchissement de la partie", err);
+                });
+        }
+
+        refreshGameState();
+        setInterval(refreshGameState, 3000);
+    </script>
 </body>
 </html>
