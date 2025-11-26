@@ -17,7 +17,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 SERVICE_ACCOUNT_FILE = os.path.join(
     BASE_DIR,
-    "pokerplanning-749a9-firebase-adminsdk-fbsvc-a147168139.json"
+    "pokerplanning-749a9-firebase-adminsdk-fbsvc-90ec4208bf.json"  # <- adapte le nom si besoin
 )
 
 if not firebase_admin._apps:
@@ -145,19 +145,54 @@ def waiting(session_id):
 
 @app.route('/api/participants/<session_id>')
 def api_participants(session_id):
+    """API polled par la salle d'attente pour :
+       - rafraîchir la liste des participants
+       - savoir si la partie a démarré (status).
+    """
     session_ref = db.collection('sessions').document(session_id)
-    participants = [p.to_dict() for p in session_ref.collection('participants').stream()]
-    return jsonify({"participants": participants})
+    session_doc = session_ref.get()
+
+    if not session_doc.exists:
+        return jsonify({"error": "session_not_found"}), 404
+
+    session_data = session_doc.to_dict()
+    raw_participants = [p.to_dict() for p in session_ref.collection('participants').stream()]
+
+    participants = [
+        {
+            "name": p.get("name"),
+            "vote": p.get("vote"),
+            "avatarSeed": p.get("avatarSeed", AVATAR_SEEDS[0])
+        }
+        for p in raw_participants
+    ]
+
+    return jsonify({
+        "participants": participants,
+        "status": session_data.get("status", "waiting")  # 'waiting' ou 'started'
+    })
 
 
 @app.route('/start/<session_id>', methods=['POST'])
 def start(session_id):
+    """Lancement de la partie par l'organisateur."""
     session_ref = db.collection('sessions').document(session_id)
-    session_data = session_ref.get().to_dict()
+    session_data = session_ref.get().to_dict() or {}
 
-    if session.get('username') != session_data['organizer']:
+    # On prend le pseudo de la session Flask ou du champ caché du formulaire
+    username = session.get('username') or request.form.get('username')
+
+    app.logger.info(
+        "Start appelé pour session %s : username=%s / organizer=%s",
+        session_id,
+        username,
+        session_data.get('organizer')
+    )
+
+    if not username or username != session_data.get('organizer'):
         return "Vous n'êtes pas autorisé à lancer la partie."
 
+    # OK → on peut lancer la partie
     session_ref.update({'status': 'started'})
     return redirect(url_for('vote', session_id=session_id))
 

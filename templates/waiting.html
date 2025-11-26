@@ -57,39 +57,39 @@
 
                     <ul id="participants-list">
                         {% for p in participants %}
-                            <li class="participant-item">
-                                <img
-                                    class="avatar-icon"
-                                    src="https://api.dicebear.com/9.x/avataaars/svg?seed={{ p.avatarSeed or 'astronaut' }}&backgroundColor=b6e3f4&radius=50"
-                                    alt="avatar {{ p.name }}"
-                                >
-                                <span>{{ p.name }}</span>
-                            </li>
+                        <li class="participant-item">
+                            <img
+                                class="avatar-icon"
+                                src="https://api.dicebear.com/9.x/avataaars/svg?seed={{ p.avatarSeed or 'astronaut' }}&backgroundColor=b6e3f4&radius=50"
+                                alt="avatar {{ p.name }}">
+                            <span>{{ p.name }}</span>
+                        </li>
                         {% endfor %}
                     </ul>
 
                     {% if session.organizer == current_user %}
-                        <form
-                          method="post"
-                          action="{{ url_for('start', session_id=session_id) }}"
-                          style="margin-top: 15px;"
-                        >
-                            <button type="submit" class="btn btn-primary full-width">
-                                Lancer la partie
-                            </button>
-                        </form>
+                    <form method="post" action="{{ url_for('start', session_id=session_id) }}"
+                          style="margin-top: 15px;">
+                        <!-- On renvoie aussi le pseudo au serveur au cas où la session Flask serait perdue -->
+                        <input type="hidden" name="username" value="{{ current_user }}">
+
+                        <button type="submit" class="btn btn-primary full-width">
+                            Lancer la partie
+                        </button>
+                    </form>
                     {% else %}
-                        <p class="hero-small" style="margin-top: 12px;">
-                            En attente que l’organisateur démarre…
-                        </p>
+                    <p class="hero-small" style="margin-top: 12px;">
+                        En attente que l’organisateur démarre…
+                    </p>
                     {% endif %}
+
                 </div>
             </section>
 
         </div>
     </main>
 
-    <!-- Rafraîchissement auto des participants -->
+    <!-- Rafraîchissement auto des participants + redirection -->
     <script>
         const sessionId = "{{ session_id }}";
 
@@ -97,10 +97,11 @@
           fetch(`/api/participants/${sessionId}`)
             .then(response => response.json())
             .then(data => {
+              // 1) Met à jour la liste des participants avec AVATARS
               const ul = document.getElementById('participants-list');
-              ul.innerHTML = ""; // on vide la liste
+              ul.innerHTML = "";
 
-              data.participants.forEach(p => {
+              (data.participants || []).forEach(p => {
                 const li = document.createElement('li');
                 li.className = 'participant-item';
 
@@ -116,13 +117,20 @@
                 li.appendChild(span);
                 ul.appendChild(li);
               });
+
+              // 2) Si la partie est démarrée -> on envoie le joueur sur la page de vote
+              if (data.status === "started") {
+                window.location.href = `/vote/${sessionId}`;
+              }
             })
             .catch(err => {
               console.error("Erreur lors du rafraîchissement des participants", err);
             });
         }
 
+        // premier appel
         refreshParticipants();
+        // puis toutes les 3 secondes
         setInterval(refreshParticipants, 3000);
     </script>
 
