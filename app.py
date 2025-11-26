@@ -1,10 +1,9 @@
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 import os
-import random
-import string
-
+import random, string
 import firebase_admin
 from firebase_admin import credentials, firestore
+
 
 app = Flask(__name__)
 app.secret_key = "une_grosse_chaine_aleatoire_que_tu_genere"
@@ -175,11 +174,14 @@ def api_participants(session_id):
 
 @app.route('/start/<session_id>', methods=['POST'])
 def start(session_id):
-    """Lancement de la partie par l'organisateur."""
     session_ref = db.collection('sessions').document(session_id)
-    session_data = session_ref.get().to_dict() or {}
+    session_doc = session_ref.get()
 
-    # On prend le pseudo de la session Flask ou du champ caché du formulaire
+    if not session_doc.exists:
+        return "Session introuvable", 404
+
+    session_data = session_doc.to_dict() or {}
+
     username = session.get('username') or request.form.get('username')
 
     app.logger.info(
@@ -192,13 +194,71 @@ def start(session_id):
     if not username or username != session_data.get('organizer'):
         return "Vous n'êtes pas autorisé à lancer la partie."
 
-    # OK → on peut lancer la partie
-    session_ref.update({'status': 'started'})
+    # On initialise l’index de story et on indique que les cartes ne sont pas révélées
+    session_ref.update({
+        'status': 'started',
+        'currentStoryIndex': 0,
+        'reveal': False
+    })
+
+    # Optionnel : reset des votes avant de commencer
+    for p in session_ref.collection('participants').stream():
+        p.reference.update({'vote': None})
+
     return redirect(url_for('vote', session_id=session_id))
 
 
 @app.route('/vote/<session_id>', methods=['GET', 'POST'])
 def vote(session_id):
+    session_ref = db.collection('sessions').document(session_id)
+    session_doc = session_ref.get()
+
+    if not session_doc.exists:
+        return "Session introuvable", 404
+
+    session_data = session_doc.to_dict() or {}
+
+    if 'username' not in session:
+        return redirect(url_for('join'))
+
+    username = session['username']
+    avatar_seed = session.get('avatarSeed', 'astronaut')
+
+    if request.method == 'POST':
+        # Vote de l'utilisateur
+        vote_value = request.form['vote']
+        participants_ref = session_ref.collection('participants')
+
+        found = False
+        for p in participants_ref.stream():
+            data = p.to_dict()
+            if data.get('name') == username:
+                p.reference.update({'vote': vote_value})
+                found = True
+                break
+
+        if not found:
+            participants_ref.add({
+                'name': username,
+                'vote': vote_value,
+                'avatarSeed': avatar_seed
+            })
+
+        return redirect(url_for('vote', session_id=session_id))
+
+    # GET : affichage initial (le détail sera ensuite rafraîchi via /api/game)
+    participants = [p.to_dict() for p in session_ref.collection('participants').stream()]
+    is_organizer = (username == session_data.get('organizer'))
+
+    return render_template(
+        'vote.html',
+        session=session_data,
+        participants=participants,
+        session_id=session_id,
+        current_user=username,
+        is_organizer=is_organizer
+    )
+
     session_ref = db.collection('sessions').document(session_id)
     session_data = session_ref.get().to_dict()
 
@@ -234,6 +294,61 @@ def vote(session_id):
     participants = [p.to_dict() for p in session_ref.collection('participants').stream()]
     return render_template('vote.html', session=session_data, participants=participants)
 
+@app.route('/reveal/<session_id>', methods=['POST'])
+def reveal(session_id):
+    session_ref = db.collection('sessions').document(session_id)
+    session_doc = session_ref.get()
+
+    if not session_doc.exists:
+        return "Session introuvable", 404
+
+    session_data = session_doc.to_dict() or {}
+    username = session.get('username') or request.form.get('username')
+
+    if not username or username != session_data.get('organizer'):
+        return "Vous n'êtes pas autorisé à révéler les cartes."
+
+    session_ref.update({'reveal': True})
+    return redirect(url_for('vote', session_id=session_id))
+
+@app.route('/api/game/<session_id>')
+def api_game(session_id):
+    """État de la partie pour la phase de vote."""
+    session_ref = db.collection('sessions').document(session_id)
+    session_doc = session_ref.get()
+
+    if not session_doc.exists:
+        return jsonify({"error": "session_not_found"}), 404
+
+    session_data = session_doc.to_dict() or {}
+    user_stories = session_data.get('userStories', [])
+    current_index = session_data.get('currentStoryIndex', 0)
+    current_story = user_stories[current_index] if 0 <= current_index < len(user_stories) else ""
+
+    participants_ref = session_ref.collection('participants')
+    raw_participants = [p.to_dict() for p in participants_ref.stream()]
+
+    participants = []
+    all_voted = True
+    for p in raw_participants:
+        has_voted = p.get('vote') is not None
+        if not has_voted:
+            all_voted = False
+
+        participants.append({
+            "name": p.get("name"),
+            "avatarSeed": p.get("avatarSeed", "astronaut"),
+            # On n’envoie la valeur de vote que si reveal = True
+            "vote": p.get("vote") if session_data.get("reveal") else None,
+            "hasVoted": has_voted,
+        })
+
+    return jsonify({
+        "participants": participants,
+        "allVoted": all_voted,
+        "reveal": session_data.get("reveal", False),
+        "currentStory": current_story,
+    })
 
 # ---------------------------------------------------------
 # Lancer l'application
