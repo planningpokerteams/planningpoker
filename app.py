@@ -4,19 +4,17 @@ import random, string
 import firebase_admin
 from firebase_admin import credentials, firestore
 
-
 app = Flask(__name__)
 app.secret_key = "une_grosse_chaine_aleatoire_que_tu_genere"
 
 # -------------------------------
-# Initialisation Firebase
+# Firebase
 # -------------------------------
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
 SERVICE_ACCOUNT_FILE = os.path.join(
     BASE_DIR,
-    "pokerplanning-749a9-firebase-adminsdk-fbsvc-90ec4208bf.json"  # <- adapte le nom si besoin
+    "pokerplanning-749a9-firebase-adminsdk-fbsvc-7422ebcd6e.json"
 )
 
 if not firebase_admin._apps:
@@ -25,26 +23,15 @@ if not firebase_admin._apps:
 
 db = firestore.client()
 
-# -------------------------------
-# Avatars DiceBear (seeds)
-# -------------------------------
-
 AVATAR_SEEDS = [
-    "astronaut",
-    "ninja",
-    "pirate",
-    "wizard",
-    "gamer",
-    "robot",
-    "detective",
-    "viking",
+    "astronaut", "ninja", "pirate", "wizard",
+    "gamer", "robot", "detective", "viking"
 ]
 
 
 # ---------------------------------------------------------
 # Utilitaires
 # ---------------------------------------------------------
-
 def generate_session_id():
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
 
@@ -52,12 +39,14 @@ def generate_session_id():
 # ---------------------------------------------------------
 # ROUTES
 # ---------------------------------------------------------
-
 @app.route('/')
 def index():
     return render_template('index.html')
 
 
+# ---------------------------------------------------------
+# CRÉATION SESSION
+# ---------------------------------------------------------
 @app.route('/create', methods=['GET', 'POST'])
 def create():
     if request.method == 'POST':
@@ -70,33 +59,40 @@ def create():
         session_id = generate_session_id()
         session_ref = db.collection('sessions').document(session_id)
 
-        # Création de la session
+        # Création de la session (TOUS LES CHAMPS IMPORTANTS)
         session_ref.set({
-            'organizer': organizer,
-            'difficulty': difficulty,
-            'rounds': rounds,
-            'status': 'waiting',
-            'userStories': user_stories
+            "organizer": organizer,
+            "difficulty": difficulty,
+            "rounds": rounds,
+            "status": "waiting",
+            "userStories": user_stories,
+            "currentStoryIndex": 0,
+            "reveal": False,
+            "final_result": None,
+            "history": []   # <-- NECESSAIRE POUR L'HISTORIQUE
         })
 
-        # L’organisateur est aussi un participant avec avatar
-        session_ref.collection('participants').add({
-            'name': organizer,
-            'vote': None,
-            'avatarSeed': avatar_seed
+        # Ajouter l'organisateur
+        session_ref.collection("participants").add({
+            "name": organizer,
+            "vote": None,
+            "avatarSeed": avatar_seed,
+            "hasVoted": False
         })
 
         # Session Flask
-        session['username'] = organizer
-        session['session_id'] = session_id
-        session['avatarSeed'] = avatar_seed
+        session["username"] = organizer
+        session["session_id"] = session_id
+        session["avatarSeed"] = avatar_seed
 
         return redirect(url_for('waiting', session_id=session_id))
 
-    # GET → on envoie la liste des avatars au template
-    return render_template('create.html', avatars=AVATAR_SEEDS)
+    return render_template("create.html", avatars=AVATAR_SEEDS)
 
 
+# ---------------------------------------------------------
+# REJOINDRE
+# ---------------------------------------------------------
 @app.route('/join', methods=['GET', 'POST'])
 def join():
     if request.method == 'POST':
@@ -104,255 +100,238 @@ def join():
         name = request.form['name']
         avatar_seed = request.form.get('avatar_seed', AVATAR_SEEDS[0])
 
-        session_ref = db.collection('sessions').document(code)
-
+        session_ref = db.collection("sessions").document(code)
         if not session_ref.get().exists:
-            return "Code invalide. Veuillez réessayer."
+            return "Code invalide."
 
-        # Ajout du participant avec avatar
-        session_ref.collection('participants').add({
-            'name': name,
-            'vote': None,
-            'avatarSeed': avatar_seed
+        session_ref.collection("participants").add({
+            "name": name,
+            "vote": None,
+            "avatarSeed": avatar_seed,
+            "hasVoted": False
         })
 
-        # Session Flask
-        session['username'] = name
-        session['session_id'] = code
-        session['avatarSeed'] = avatar_seed
+        session["username"] = name
+        session["session_id"] = code
+        session["avatarSeed"] = avatar_seed
 
-        return redirect(url_for('waiting', session_id=code))
+        return redirect(url_for("waiting", session_id=code))
 
-    # GET → on envoie la liste des avatars au template
-    return render_template('join.html', avatars=AVATAR_SEEDS)
+    return render_template("join.html", avatars=AVATAR_SEEDS)
 
 
+# ---------------------------------------------------------
+# SALLE D'ATTENTE
+# ---------------------------------------------------------
 @app.route('/waiting/<session_id>')
 def waiting(session_id):
     session_ref = db.collection('sessions').document(session_id)
     session_data = session_ref.get().to_dict()
     participants = [p.to_dict() for p in session_ref.collection('participants').stream()]
 
-    return render_template(
-        'waiting.html',
-        session_id=session_id,
-        session=session_data,
-        participants=participants,
-        current_user=session.get('username')
-    )
+    return render_template("waiting.html",
+                           session_id=session_id,
+                           session=session_data,
+                           participants=participants,
+                           current_user=session.get("username")
+                           )
 
 
+# ---------------------------------------------------------
+# API PARTICIPANTS
+# ---------------------------------------------------------
 @app.route('/api/participants/<session_id>')
 def api_participants(session_id):
-    """API polled par la salle d'attente pour :
-       - rafraîchir la liste des participants
-       - savoir si la partie a démarré (status).
-    """
-    session_ref = db.collection('sessions').document(session_id)
-    session_doc = session_ref.get()
-
-    if not session_doc.exists:
+    session_ref = db.collection("sessions").document(session_id)
+    if not session_ref.get().exists:
         return jsonify({"error": "session_not_found"}), 404
 
-    session_data = session_doc.to_dict()
-    raw_participants = [p.to_dict() for p in session_ref.collection('participants').stream()]
-
+    session_data = session_ref.get().to_dict()
     participants = [
-        {
-            "name": p.get("name"),
-            "vote": p.get("vote"),
-            "avatarSeed": p.get("avatarSeed", AVATAR_SEEDS[0])
-        }
-        for p in raw_participants
+        p.to_dict() for p in session_ref.collection("participants").stream()
     ]
 
     return jsonify({
         "participants": participants,
-        "status": session_data.get("status", "waiting")  # 'waiting' ou 'started'
+        "status": session_data.get("status", "waiting")
     })
 
 
+# ---------------------------------------------------------
+# DÉMARRAGE PARTIE
+# ---------------------------------------------------------
 @app.route('/start/<session_id>', methods=['POST'])
 def start(session_id):
-    session_ref = db.collection('sessions').document(session_id)
-    session_doc = session_ref.get()
-
-    if not session_doc.exists:
+    session_ref = db.collection("sessions").document(session_id)
+    if not session_ref.get().exists:
         return "Session introuvable", 404
 
-    session_data = session_doc.to_dict() or {}
+    username = session.get("username")
 
-    username = session.get('username') or request.form.get('username')
+    # Only organizer
+    session_data = session_ref.get().to_dict()
+    if username != session_data.get("organizer"):
+        return "Vous n'êtes pas autorisé"
 
-    app.logger.info(
-        "Start appelé pour session %s : username=%s / organizer=%s",
-        session_id,
-        username,
-        session_data.get('organizer')
-    )
+    # Reset votes
+    for p in session_ref.collection("participants").stream():
+        p.reference.update({"vote": None, "hasVoted": False})
 
-    if not username or username != session_data.get('organizer'):
-        return "Vous n'êtes pas autorisé à lancer la partie."
-
-    # On initialise l’index de story et on indique que les cartes ne sont pas révélées
     session_ref.update({
-        'status': 'started',
-        'currentStoryIndex': 0,
-        'reveal': False
+        "status": "started",
+        "currentStoryIndex": 0,
+        "reveal": False
     })
 
-    # Optionnel : reset des votes avant de commencer
-    for p in session_ref.collection('participants').stream():
-        p.reference.update({'vote': None})
-
-    return redirect(url_for('vote', session_id=session_id))
+    return redirect(url_for("vote", session_id=session_id))
 
 
+# ---------------------------------------------------------
+# PAGE VOTE
+# ---------------------------------------------------------
 @app.route('/vote/<session_id>', methods=['GET', 'POST'])
 def vote(session_id):
-    session_ref = db.collection('sessions').document(session_id)
-    session_doc = session_ref.get()
-
-    if not session_doc.exists:
-        return "Session introuvable", 404
-
-    session_data = session_doc.to_dict() or {}
-
-    if 'username' not in session:
-        return redirect(url_for('join'))
-
-    username = session['username']
-    avatar_seed = session.get('avatarSeed', 'astronaut')
-
-    if request.method == 'POST':
-        # Vote de l'utilisateur
-        vote_value = request.form['vote']
-        participants_ref = session_ref.collection('participants')
-
-        found = False
-        for p in participants_ref.stream():
-            data = p.to_dict()
-            if data.get('name') == username:
-                p.reference.update({'vote': vote_value})
-                found = True
-                break
-
-        if not found:
-            participants_ref.add({
-                'name': username,
-                'vote': vote_value,
-                'avatarSeed': avatar_seed
-            })
-
-        return redirect(url_for('vote', session_id=session_id))
-
-    # GET : affichage initial (le détail sera ensuite rafraîchi via /api/game)
-    participants = [p.to_dict() for p in session_ref.collection('participants').stream()]
-    is_organizer = (username == session_data.get('organizer'))
-
-    return render_template(
-        'vote.html',
-        session=session_data,
-        participants=participants,
-        session_id=session_id,
-        current_user=username,
-        is_organizer=is_organizer
-    )
-
-    session_ref = db.collection('sessions').document(session_id)
+    session_ref = db.collection("sessions").document(session_id)
     session_data = session_ref.get().to_dict()
 
-    # L'utilisateur doit avoir un pseudo en session
-    if 'username' not in session:
-        return redirect(url_for('join'))
+    if "username" not in session:
+        return redirect(url_for("join"))
 
-    username = session['username']
-    avatar_seed = session.get('avatarSeed', AVATAR_SEEDS[0])
+    username = session["username"]
 
-    if request.method == 'POST':
-        vote_value = request.form['vote']
-        participants_ref = session_ref.collection('participants')
-
-        found = False
-        for p in participants_ref.stream():
-            data = p.to_dict()
-            if data.get('name') == username:
-                p.reference.update({'vote': vote_value})
-                found = True
+    if request.method == "POST":
+        vote_val = request.form["vote"]
+        for p in session_ref.collection("participants").stream():
+            if p.to_dict().get("name") == username:
+                p.reference.update({"vote": vote_val, "hasVoted": True})
                 break
+        return redirect(url_for("vote", session_id=session_id))
 
-        # Si pour une raison quelconque le participant n'existe pas, on le crée (avec avatar)
-        if not found:
-            participants_ref.add({
-                'name': username,
-                'vote': vote_value,
-                'avatarSeed': avatar_seed
-            })
+    participants = [p.to_dict() for p in session_ref.collection("participants").stream()]
+    is_organizer = (username == session_data.get("organizer"))
 
-        return redirect(url_for('vote', session_id=session_id))
+    return render_template("vote.html",
+                           session=session_data,
+                           participants=participants,
+                           session_id=session_id,
+                           current_user=username,
+                           is_organizer=is_organizer)
 
-    participants = [p.to_dict() for p in session_ref.collection('participants').stream()]
-    return render_template('vote.html', session=session_data, participants=participants)
 
+# ---------------------------------------------------------
+# RÉVÉLER LES CARTES
+# ---------------------------------------------------------
 @app.route('/reveal/<session_id>', methods=['POST'])
 def reveal(session_id):
-    session_ref = db.collection('sessions').document(session_id)
-    session_doc = session_ref.get()
+    session_ref = db.collection("sessions").document(session_id)
+    data = session_ref.get().to_dict()
+    username = session.get("username")
 
-    if not session_doc.exists:
-        return "Session introuvable", 404
+    if username != data.get("organizer"):
+        return "Non autorisé"
 
-    session_data = session_doc.to_dict() or {}
-    username = session.get('username') or request.form.get('username')
+    session_ref.update({"reveal": True})
+    return redirect(url_for("vote", session_id=session_id))
 
-    if not username or username != session_data.get('organizer'):
-        return "Vous n'êtes pas autorisé à révéler les cartes."
 
-    session_ref.update({'reveal': True})
-    return redirect(url_for('vote', session_id=session_id))
-
+# ---------------------------------------------------------
+# API ÉTAT DE JEU
+# ---------------------------------------------------------
 @app.route('/api/game/<session_id>')
 def api_game(session_id):
-    """État de la partie pour la phase de vote."""
-    session_ref = db.collection('sessions').document(session_id)
-    session_doc = session_ref.get()
+    session_ref = db.collection("sessions").document(session_id)
+    if not session_ref.get().exists:
+        return jsonify({"error": "not_found"}), 404
 
-    if not session_doc.exists:
-        return jsonify({"error": "session_not_found"}), 404
+    data = session_ref.get().to_dict() or {}
 
-    session_data = session_doc.to_dict() or {}
-    user_stories = session_data.get('userStories', [])
-    current_index = session_data.get('currentStoryIndex', 0)
-    current_story = user_stories[current_index] if 0 <= current_index < len(user_stories) else ""
+    # stories
+    stories = data.get("userStories", [])
+    idx = data.get("currentStoryIndex", 0)
+    current_story = stories[idx] if idx < len(stories) else ""
 
-    participants_ref = session_ref.collection('participants')
-    raw_participants = [p.to_dict() for p in participants_ref.stream()]
-
+    # participants
+    participants_raw = [p.to_dict() for p in session_ref.collection("participants").stream()]
     participants = []
     all_voted = True
-    for p in raw_participants:
-        has_voted = p.get('vote') is not None
+
+    for p in participants_raw:
+        has_voted = p.get("vote") is not None
         if not has_voted:
             all_voted = False
 
         participants.append({
-            "name": p.get("name"),
+            "name": p["name"],
             "avatarSeed": p.get("avatarSeed", "astronaut"),
-            # On n’envoie la valeur de vote que si reveal = True
-            "vote": p.get("vote") if session_data.get("reveal") else None,
-            "hasVoted": has_voted,
+            "vote": p.get("vote") if data.get("reveal") else None,
+            "hasVoted": has_voted
         })
 
     return jsonify({
         "participants": participants,
         "allVoted": all_voted,
-        "reveal": session_data.get("reveal", False),
+        "reveal": data.get("reveal", False),
         "currentStory": current_story,
+        "history": data.get("history", [])
     })
 
-# ---------------------------------------------------------
-# Lancer l'application
-# ---------------------------------------------------------
 
+# ---------------------------------------------------------
+# NEXT STORY
+# ---------------------------------------------------------
+@app.route('/next_story/<session_id>', methods=['POST'])
+def next_story(session_id):
+    session_ref = db.collection("sessions").document(session_id)
+    doc = session_ref.get()
+    if not doc.exists:
+        return jsonify({"error": "not_found"}), 404
+
+    data = doc.to_dict()
+    stories = data.get("userStories", [])
+    idx = data.get("currentStoryIndex", 0)
+    history = data.get("history", [])
+
+    # result
+    result = data.get("final_result")
+    history.append({
+        "story": stories[idx] if idx < len(stories) else "",
+        "result": result
+    })
+
+    # next index
+    idx = min(idx + 1, len(stories) - 1)
+
+    # reset votes
+    for p in session_ref.collection('participants').stream():
+        p.reference.update({"vote": None, "hasVoted": False})
+
+    session_ref.update({
+        "history": history,
+        "currentStoryIndex": idx,
+        "reveal": False,
+        "final_result": None
+    })
+
+    return jsonify({"status": "ok"})
+
+
+# ---------------------------------------------------------
+# REVOTE
+# ---------------------------------------------------------
+@app.route('/revote/<session_id>', methods=['POST'])
+def revote(session_id):
+    session_ref = db.collection("sessions").document(session_id)
+    if not session_ref.get().exists:
+        return jsonify({"error": "not_found"}), 404
+
+    for p in session_ref.collection("participants").stream():
+        p.reference.update({"vote": None, "hasVoted": False})
+
+    session_ref.update({"reveal": False, "final_result": None})
+
+    return jsonify({"status": "ok"})
+
+
+# ---------------------------------------------------------
 if __name__ == '__main__':
     app.run(debug=True)
