@@ -1,0 +1,989 @@
+/* ===============================
+   Reset léger & base typographique
+   =============================== */
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+                 Roboto, Helvetica, Arial, sans-serif;
+    color: #111827;
+}
+
+/* ===============================
+   Fond général de l'application
+   =============================== */
+
+.landing-body {
+    min-height: 100vh;
+    background: linear-gradient(180deg, #f9fafb 0%, #e5e7eb 40%, #eef2ff 100%);
+}
+
+/* ===============================
+   Navbar principale
+   =============================== */
+
+.navbar {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background-color: #ffffff;
+    border-bottom: 1px solid #e5e7eb;
+    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.04);
+}
+
+.nav-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+}
+
+/* Logo Poker Planning (icône + texte) */
+.logo {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: 1.15rem;
+    letter-spacing: 0.02em;
+    color: #111827;
+}
+
+.logo-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 999px;
+    background: radial-gradient(circle at 30% 30%, #4f46e5, #7c3aed);
+    color: #ffffff;
+    font-size: 0.9rem;
+}
+
+.logo-text {
+    margin-top: 1px;
+}
+
+/* Liens de navigation */
+.nav-links {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 0.95rem;
+}
+
+.nav-links a {
+    text-decoration: none;
+    color: #4b5563;
+    padding: 6px 4px;
+    border-radius: 999px;
+    transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+.nav-links a:hover {
+    color: #111827;
+    background-color: #eef2ff;
+}
+
+/* Zone boutons à droite (Créer / Rejoindre) */
+.nav-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* ===============================
+   Boutons génériques
+   =============================== */
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    padding: 8px 16px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    text-decoration: none;
+    transition:
+        transform 0.12s ease,
+        box-shadow 0.12s ease,
+        background-color 0.12s ease,
+        color 0.12s ease;
+    white-space: nowrap;
+}
+
+/* Bouton principal (CTA) */
+.btn-primary {
+    background: linear-gradient(135deg, #4f46e5, #6366f1);
+    color: #ffffff;
+    box-shadow: 0 10px 25px rgba(79, 70, 229, 0.35);
+}
+
+.btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 14px 30px rgba(79, 70, 229, 0.45);
+    background: linear-gradient(135deg, #4338ca, #4f46e5);
+}
+
+/* Bouton fantôme (bordure grise) */
+.btn-ghost {
+    background-color: transparent;
+    color: #4b5563;
+    border: 1px solid #d1d5db;
+}
+
+.btn-ghost:hover {
+    background-color: #f3f4f6;
+    color: #111827;
+}
+
+/* Variantes de taille / largeur */
+.btn-lg {
+    padding: 11px 22px;
+    font-size: 1rem;
+}
+
+.full-width {
+    width: 100%;
+}
+
+/* ===============================
+   Section hero (page d'accueil)
+   =============================== */
+
+.hero {
+    padding: 72px 16px 96px;
+}
+
+.hero-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 48px;
+    flex-wrap: wrap;
+}
+
+.hero-text {
+    flex: 1 1 340px;
+    min-width: 280px;
+}
+
+.hero-text h1 {
+    font-size: clamp(2.1rem, 3vw, 2.7rem);
+    line-height: 1.1;
+    margin: 0 0 14px;
+    letter-spacing: -0.03em;
+}
+
+.hero-subtitle {
+    margin: 0 0 24px;
+    font-size: 1rem;
+    color: #4b5563;
+    max-width: 420px;
+}
+
+.hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.hero-small {
+    font-size: 0.85rem;
+    color: #6b7280;
+}
+
+.hero-card {
+    flex: 1 1 320px;
+    min-width: 280px;
+    display: flex;
+    justify-content: center;
+}
+
+/* ===============================
+   Carte de création de session
+   =============================== */
+
+.session-card {
+    width: 100%;
+    max-width: 360px;
+    background-color: #ffffff;
+    border-radius: 18px;
+    box-shadow: 0 22px 50px rgba(15, 23, 42, 0.18);
+    padding: 22px 22px 26px;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.session-card h2 {
+    margin: 0 0 18px;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #111827;
+}
+
+.session-card label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 0.85rem;
+    color: #6b7280;
+}
+
+.session-card input,
+.session-card select {
+    width: 100%;
+    padding: 9px 11px;
+    border-radius: 10px;
+    border: 1px solid #d1d5db;
+    font-size: 0.95rem;
+    outline: none;
+    background-color: #f9fafb;
+    margin-bottom: 12px;
+    transition:
+        border-color 0.12s ease,
+        box-shadow 0.12s ease,
+        background-color 0.12s ease;
+}
+
+.session-card input:focus,
+.session-card select:focus {
+    border-color: #4f46e5;
+    box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.3);
+    background-color: #ffffff;
+}
+
+.session-hint {
+    margin-top: 10px;
+    font-size: 0.85rem;
+    color: #6b7280;
+    text-align: center;
+}
+
+.session-hint a {
+    color: #4f46e5;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.session-hint a:hover {
+    text-decoration: underline;
+}
+
+/* ===============================
+   Sections “features / steps / about”
+   =============================== */
+
+.features,
+.steps,
+.about {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 40px 16px 0;
+}
+
+.features h2,
+.steps h2 {
+    font-size: 1.3rem;
+    margin-bottom: 18px;
+}
+
+/* Cartes de fonctionnalités */
+.features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 18px;
+}
+
+.feature-card {
+    background-color: rgba(255, 255, 255, 0.7);
+    border-radius: 14px;
+    padding: 16px 18px;
+    border: 1px solid rgba(209, 213, 219, 0.7);
+    box-shadow: 0 10px 25px rgba(15, 23, 42, 0.06);
+}
+
+.feature-card h3 {
+    margin: 0 0 6px;
+    font-size: 1rem;
+}
+
+.feature-card p {
+    margin: 0;
+    font-size: 0.9rem;
+    color: #4b5563;
+}
+
+/* Étapes de fonctionnement */
+.steps-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    gap: 10px;
+    font-size: 0.95rem;
+    color: #374151;
+}
+
+.steps-list li {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.steps-list span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 22px;
+    font-size: 0.8rem;
+    border-radius: 999px;
+    background-color: #eef2ff;
+    color: #4f46e5;
+    font-weight: 600;
+}
+
+/* Bloc “à propos” en bas de page */
+.about {
+    padding-bottom: 40px;
+    font-size: 0.9rem;
+    color: #6b7280;
+}
+
+/* ===============================
+   Responsive global (mobile)
+   =============================== */
+
+@media (max-width: 768px) {
+    .nav-inner {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 10px 16px;
+    }
+
+    .nav-links {
+        display: none; /* Navigation simplifiée sur mobile */
+    }
+
+    .hero {
+        padding-top: 50px;
+    }
+
+    .hero-inner {
+        gap: 32px;
+    }
+
+    .session-card {
+        max-width: 380px;
+    }
+}
+
+/* ===============================
+   Choix d’avatars (create / join)
+   =============================== */
+
+.avatar-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.avatar-option {
+    cursor: pointer;
+    border-radius: 999px;
+    padding: 4px;
+    border: 2px solid transparent;
+    transition:
+        transform 0.15s ease,
+        box-shadow 0.15s ease,
+        border-color 0.15s ease;
+}
+
+.avatar-option input {
+    display: none; /* on masque le radio natif */
+}
+
+.avatar-option img {
+    width: 40px;
+    height: 40px;
+    border-radius: 999px;
+    display: block;
+    border: 2px solid transparent;
+}
+
+/* État sélectionné : radio coché */
+.avatar-option input:checked + img {
+    border-color: #7852ff;
+    box-shadow: 0 0 0 2px rgba(120, 82, 255, 0.4);
+    transform: translateY(-1px);
+}
+
+/* Effet hover sur l’avatar */
+.avatar-option:hover img {
+    box-shadow: 0 0 0 2px rgba(120, 82, 255, 0.3);
+}
+
+/* Lignes de la liste de participants (waiting room) */
+.participant-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 4px 0;
+}
+
+.avatar-icon {
+    width: 36px;
+    height: 36px;   /* avatar plus petit que sur la table de jeu */
+    border-radius: 999px;
+    object-fit: cover;
+}
+
+/* ===============================
+   Phase de jeu – layout général
+   =============================== */
+
+.game-main {
+    max-width: 1100px;
+    margin: 40px auto 60px;
+    padding: 0 24px 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 32px;
+}
+
+.game-header {
+    text-align: center;
+}
+
+.game-header h1 {
+    margin-bottom: 8px;
+}
+
+.game-table-wrapper {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+}
+
+/* ===============================
+   Table de poker centrale
+   =============================== */
+
+.poker-table {
+    position: relative;
+    width: min(90vw, 820px);
+    height: min(50vw, 440px);
+    border-radius: 999px;
+    background: radial-gradient(circle at 30% 20%, #3446b9, #181b4b);
+    box-shadow: 0 40px 80px rgba(10, 16, 54, 0.55);
+    padding: 32px;
+}
+
+/* Bloc central “Poker Planning” au milieu de la table */
+.table-center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 18px;
+    border-radius: 999px;
+    background: rgba(6, 11, 44, 0.9);
+    color: #fff;
+    backdrop-filter: blur(10px);
+}
+
+.table-logo {
+    font-size: 28px;
+}
+
+.table-title {
+    font-weight: 600;
+    margin: 0;
+}
+
+.table-status {
+    font-size: 12px;
+    opacity: 0.85;
+    margin: 0;
+}
+
+/* ===============================
+   Joueurs autour de la table
+   =============================== */
+
+.player-seat {
+    position: absolute;
+    width: 110px;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    color: #fff;
+    font-size: 12px;
+}
+
+.player-avatar {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.7);
+    margin-bottom: 4px;
+}
+
+.player-name {
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.player-status {
+    font-size: 11px;
+    opacity: 0.85;
+}
+
+/* Effet visuel quand un joueur a voté */
+.player-seat.has-voted .player-avatar {
+    box-shadow: 0 0 0 3px rgba(88, 246, 145, 0.6);
+}
+
+/* Effet spécial pour “moi” (optionnel si utilisé) */
+.player-seat.player-me .player-avatar {
+    border-color: #ffd86b;
+    box-shadow: 0 0 15px rgba(255, 216, 107, 0.8);
+}
+
+/* ===============================
+   Zone d’actions + cartes de vote
+   =============================== */
+
+.game-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+.reveal-btn {
+    min-width: 260px;
+    justify-content: center;
+}
+
+.vote-status-text {
+    margin-top: 4px;
+    text-align: center;
+}
+
+/* Rangée de grandes cartes de vote */
+.cards-row-big {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 16px;
+    margin-top: 12px;
+}
+
+/* Apparence des grandes cartes (boutons) */
+.poker-card-big {
+    width: 90px;
+    height: 120px;
+    border-radius: 14px;
+    border: none;
+    background: radial-gradient(circle at 30% 20%, #ffffff, #e4e7ff);
+    box-shadow: 0 12px 24px rgba(19, 16, 74, 0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition:
+      transform 0.15s ease,
+      box-shadow 0.15s ease,
+      background 0.15s ease;
+}
+
+.poker-card-big .card-value {
+    font-size: 26px;
+    font-weight: 700;
+    color: #111827;
+}
+
+.poker-card-big:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 18px 32px rgba(17, 24, 39, 0.35);
+}
+
+/* Carte actuellement sélectionnée par le joueur */
+.poker-card--selected {
+    background: radial-gradient(circle at 30% 10%, #4f46e5, #1d1b4a);
+    box-shadow: 0 18px 36px rgba(79, 70, 229, 0.5);
+}
+
+.poker-card--selected .card-value {
+    color: #f9fafb;
+}
+
+/* Mise en avant des votes après révélation */
+.player-seat.revealed .player-avatar {
+    border-color: #ffffff;
+    box-shadow: 0 0 18px rgba(255,255,255,0.85);
+}
+
+.player-seat.revealed .player-status {
+    background: rgba(255,255,255,0.12);
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 700;
+    backdrop-filter: blur(6px);
+}
+
+/* Texte de la user story en gros au-dessus de la table */
+.big-story-text {
+    font-size: 28px;
+    font-weight: 700;
+    text-align: center;
+    max-width: 900px;
+    margin: 0 auto 12px;
+}
+
+/* ===============================
+   Panneau d’historique à gauche
+   =============================== */
+
+.history-panel {
+    position: fixed;
+    left: 20px;
+    top: 120px;
+    width: 240px;
+    background: rgba(255,255,255,0.7);
+    backdrop-filter: blur(12px);
+    padding: 20px;
+    border-radius: 14px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+}
+
+.history-panel h3 {
+    margin-top: 0;
+    font-size: 18px;
+    font-weight: 700;
+}
+
+#history-list li {
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(0,0,0,0.1);
+}
+
+/* Image de la carte (SVG) à l’intérieur du bouton */
+.poker-card-img {
+    width: 100%;
+    height: 100%;
+    border-radius: 14px;
+    object-fit: contain;
+}
+
+/* ===============================
+   Create session – stories & mode
+   =============================== */
+
+.stories-list {
+    margin-top: 8px;
+    border-radius: 12px;
+    background: #f8fafc;
+    padding: 8px;
+    max-height: 190px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+/* Fiche d’une user story dans la liste */
+.story-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    background: #ffffff;
+    border: 1px solid rgba(148, 163, 184, 0.4);
+    cursor: grab;
+    font-size: 0.9rem;
+}
+
+.story-item:active {
+    cursor: grabbing;
+}
+
+/* Style de la cible pendant un drag & drop */
+.story-item--dragover {
+    border-style: dashed;
+    border-color: #6366f1;
+    background: #e0e7ff;
+}
+
+/* Pastille “US 1 / US 2 …” */
+.story-index {
+    font-weight: 700;
+    font-size: 0.8rem;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: #eef2ff;
+    color: #4f46e5;
+}
+
+.story-text {
+    flex: 1;
+    word-break: break-word;
+}
+
+/* Description du mode choisi sous le select */
+.mode-description {
+    margin-top: 4px;
+    font-size: 0.8rem;
+    opacity: 0.8;
+}
+
+/* Petits ajustements du formulaire de création */
+.btn-add-story {
+    margin-top: 8px;
+}
+
+.avatar-help-text {
+    margin-bottom: 6px;
+}
+
+.btn-submit-create {
+    margin-top: 16px;
+}
+
+/* ===============================
+   Salle d’attente (waiting room)
+   =============================== */
+
+.waiting-timer {
+    margin-bottom: 16px;
+    display: flex;
+    justify-content: center;
+}
+
+/* Pastille affichant le temps d’attente */
+.timer-display {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 26px;
+    border-radius: 999px;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    background: rgba(255, 255, 255, 0.9);
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    font-size: 1.25rem;
+    width: fit-content;
+}
+
+.timer-display span {
+    margin-left: 10px;
+}
+
+/* Code de session en gros */
+.waiting-code {
+    font-size: 2rem;
+    margin-top: 6px;
+    letter-spacing: 3px;
+}
+
+.waiting-start-form {
+    margin-top: 15px;
+}
+
+.waiting-organizer-text {
+    margin-top: 12px;
+}
+
+/* ===============================
+   Phase de jeu – chrono & historique
+   =============================== */
+
+/* Chrono principal de la phase de jeu (au-dessus de la table) */
+.game-timer-wrapper {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    margin-top: 96px; /* sous la navbar */
+}
+
+.game-timer {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 26px;
+    border-radius: 999px;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    background: rgba(255, 255, 255, 0.95);
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    font-size: 1.25rem;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+    transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.game-timer span {
+    margin-left: 10px;
+}
+
+/* Variante visuelle du timer quand on approche de zéro */
+.game-timer.timer-danger {
+    background: #fee2e2;
+    color: #b91c1c;
+    border-color: #fecaca;
+}
+
+/* Panneau d’historique détaillé à gauche (version large) */
+.history-panel {
+    position: fixed;
+    left: 24px;
+    top: 96px;
+    bottom: 24px;
+    width: 320px;
+    padding: 16px 18px;
+    border-radius: 24px;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 18px 45px rgba(15, 23, 42, 0.16);
+    overflow-y: auto;
+    z-index: 10;
+}
+
+.history-panel h3 {
+    margin: 0 0 12px;
+    font-size: 1rem;
+}
+
+#history-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* Carte d’historique pour une user story */
+.history-item {
+    border-radius: 18px;
+    padding: 10px 12px;
+    background: #f8fafc;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.history-story {
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+/* Badge affichant le résultat retenu */
+.history-result {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: #eef2ff;
+    font-size: 0.8rem;
+}
+
+.history-result-label {
+    opacity: 0.8;
+}
+
+.history-result-value {
+    font-weight: 700;
+}
+
+/* Liste des votes individuels dans l’historique */
+.history-votes {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.history-vote {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+}
+
+.history-avatar {
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+}
+
+.history-voter-name {
+    font-weight: 500;
+}
+
+.history-vote-card {
+    margin-left: auto;
+    font-weight: 600;
+}
+
+/* Décale le contenu principal pour laisser la place au panneau gauche */
+.game-main {
+    margin-left: 360px;
+}
+
+/* État visuel des cartes désactivées (pause / fin de partie) */
+.poker-card.poker-card--disabled {
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+/* Bouton “Reprendre la partie” (utilisé pour la pause café) */
+.btn-success {
+    background-color: #16a34a;
+    border-color: #16a34a;
+    color: #ffffff;
+}
+
+.btn-success:hover {
+    background-color: #15803d;
+    border-color: #15803d;
+}
+
+/* Casse responsive pour cacher l’historique sur petits écrans */
+@media (max-width: 1100px) {
+    .history-panel {
+        display: none;
+    }
+    .game-main {
+        margin-left: 0;
+    }
+    .game-timer-wrapper {
+        margin-top: 80px;
+    }
+}

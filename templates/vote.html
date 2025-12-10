@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Phase de jeu</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+
+<body class="landing-body">
+
+    <!-- HISTORIQUE À GAUCHE -->
+    <aside class="history-panel">
+        <h3>Historique</h3>
+        <ul id="history-list"></ul>
+    </aside>
+
+    <!-- NAVBAR -->
+    <header class="navbar">
+        <div class="nav-inner">
+            <div class="logo">
+                <span class="logo-mark">♠</span>
+                <span class="logo-text">Poker Planning</span>
+            </div>
+
+            <nav class="nav-links">
+                <a href="/">Accueil</a>
+                <a href="/create">Créer une session</a>
+                <a href="/join">Rejoindre</a>
+            </nav>
+
+            <div class="nav-actions">
+                <a href="/join" class="btn btn-ghost">Rejoindre</a>
+                <a href="/create" class="btn btn-primary">Nouvelle session</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- CONTENU -->
+    <main class="game-main">
+
+        <!-- CHRONO GLOBAL -->
+        <div class="game-timer-wrapper">
+            <div class="game-timer" id="story-timer">
+                ⏱️ <span>--:--</span>
+            </div>
+        </div>
+
+        <!-- STORY EN GROS -->
+        <section class="game-header" style="text-align:center; margin-top:24px;">
+            {% set initial_story = "" %}
+            {% if session.userStories and session.userStories|length > 0 %}
+                {% set idx = session.currentStoryIndex|default(0) %}
+                {% set initial_story = session.userStories[idx] %}
+            {% endif %}
+            <h1 id="story-text" class="big-story-text" style="margin:0; font-size:1.4rem; color:#0f172a;">
+                {{ initial_story or "Aucune user story définie" }}
+            </h1>
+            <p id="round-info" class="hero-small" style="margin-top:4px;"></p>
+        </section>
+
+        <!-- TABLE DE POKER -->
+        <section class="game-table-wrapper">
+            <div id="poker-table" class="poker-table">
+                <div class="table-center">
+                    <div class="table-logo">♠</div>
+                    <div class="table-center-text">
+                        <p class="table-title">Poker Planning</p>
+                        <p id="table-status-text" class="table-status">
+                            Clique sur une carte pour voter.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ACTIONS -->
+        <section class="game-actions">
+
+            {% if is_organizer %}
+            <form id="reveal-form"
+                  method="post"
+                  action="{{ url_for('reveal', session_id=session_id) }}">
+                <button id="reveal-button"
+                        type="submit"
+                        class="btn btn-primary reveal-btn"
+                        style="display:none;">
+                    Révéler les cartes
+                </button>
+            </form>
+            <p id="reveal-hint" class="hero-small">En attente des votes…</p>
+            {% endif %}
+
+            <p id="game-status-text" class="hero-small vote-status-text" style="display:none;"></p>
+
+            {% if is_organizer %}
+            <button id="next-button"
+                    class="btn btn-primary gm-action"
+                    style="display:none;">
+                Passer à la user story suivante
+            </button>
+
+            <button id="revote-button"
+                    class="btn btn-secondary gm-action"
+                    style="display:none;">
+                Relancer le vote
+            </button>
+
+            <button id="force-next-button"
+                    class="btn btn-danger gm-action"
+                    style="display:none;">
+                Passer quand même
+            </button>
+
+            <!-- bouton pour reprendre après la pause café -->
+            <button id="resume-button"
+                    class="btn btn-success gm-action"
+                    style="display:none;">
+                Reprendre la partie
+            </button>
+            {% endif %}
+
+            <!-- CARTES -->
+            <form id="vote-form" method="post">
+                <input type="hidden" name="vote" id="vote-input">
+                <div class="cards-row cards-row-big">
+                    {% for card in cards %}
+                    <button type="button"
+                            class="poker-card poker-card-big"
+                            data-value="{{ card.value }}">
+                        <img class="poker-card-img"
+                             src="{{ url_for('asset_file', filename=card.file) }}"
+                             alt="Carte {{ card.value }}">
+                    </button>
+                    {% endfor %}
+                </div>
+            </form>
+
+        </section>
+
+    </main>
+
+    <!-- on passe les infos dynamiques au JS statique -->
+<script>
+    window.GAME_CONFIG = {
+        sessionId: "{{ session_id }}",
+        currentUser: "{{ current_user }}",
+        isOrganizer: "{{ 'true' if is_organizer else 'false' }}"
+    };
+</script>
+<script src="{{ url_for('static', filename='scripts/vote.js') }}"></script>
+
+</body>
+</html>
+

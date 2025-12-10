@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Salle d'attente</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+
+<body class="landing-body">
+
+    <!-- NAVBAR -->
+    <header class="navbar">
+        <div class="nav-inner">
+            <div class="logo">
+                <span class="logo-mark">♠</span>
+                <span class="logo-text">Poker Planning</span>
+            </div>
+
+            <nav class="nav-links">
+                <a href="/">Accueil</a>
+            </nav>
+
+            <div class="nav-actions">
+                <a href="/join" class="btn btn-ghost">Rejoindre</a>
+                <a href="/create" class="btn btn-primary">Nouvelle session</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- CONTENU PRINCIPAL -->
+    <main class="hero" data-session-id="{{ session_id }}">
+        <div class="hero-inner">
+
+            <!-- Colonne gauche : texte -->
+            <section class="hero-text">
+                <h1>Salle d'attente</h1>
+                <p class="hero-subtitle">
+                    En attente des derniers participants…  
+                    Le Scrum Master démarre la session quand tout le monde est présent.
+                </p>
+
+                <p class="hero-small">
+                    Partage ce code pour inviter ton équipe :
+                </p>
+
+                <h2 class="waiting-code">
+                    {{ session_id }}
+                </h2>
+            </section>
+
+            <!-- Colonne droite : carte participants + chrono -->
+            <section class="hero-card">
+                <div class="session-card">
+
+                    <!-- Chronomètre centré au-dessus du contenu -->
+                    <div class="waiting-timer">
+                        <div class="timer-display" id="waiting-timer">
+                            ⏱️ <span>00:00</span>
+                        </div>
+                    </div>
+
+                    <h2>Participants</h2>
+
+                    <ul id="participants-list">
+                        {% for p in participants %}
+                        <li class="participant-item">
+                            <img
+                                class="avatar-icon"
+                                src="https://api.dicebear.com/9.x/avataaars/svg?seed={{ p.avatarSeed or 'astronaut' }}&backgroundColor=b6e3f4&radius=50"
+                                alt="avatar {{ p.name }}">
+                            <span>{{ p.name }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+
+                    {% if session.organizer == current_user %}
+                    <form method="post"
+                          action="{{ url_for('start', session_id=session_id) }}"
+                          class="waiting-start-form">
+                        <input type="hidden" name="username" value="{{ current_user }}">
+                        <button type="submit" class="btn btn-primary full-width">
+                            Lancer la partie
+                        </button>
+                    </form>
+                    {% else %}
+                    <p class="hero-small waiting-organizer-text">
+                        En attente que l’organisateur démarre…
+                    </p>
+                    {% endif %}
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <!-- JS dans /static/scripts/waiting.js -->
+    <script src="{{ url_for('static', filename='scripts/waiting.js') }}"></script>
+</body>
+</html>

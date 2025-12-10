@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Créer une session</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body class="landing-body">
+
+<header class="navbar">
+    <div class="nav-inner">
+        <div class="logo">
+            <span class="logo-mark">♠</span>
+            <span class="logo-text">Poker Planning</span>
+        </div>
+
+        <nav class="nav-links">
+            <a href="/">Accueil</a>
+        </nav>
+
+        <div class="nav-actions">
+            <a href="/join" class="btn btn-ghost">Rejoindre</a>
+            <a href="/create" class="btn btn-primary">Nouvelle session</a>
+        </div>
+    </div>
+</header>
+
+<main class="hero">
+    <div class="hero-inner">
+
+        <!-- Colonne gauche -->
+        <section class="hero-text">
+            <h1>Créer une nouvelle session</h1>
+            <p class="hero-subtitle">
+                Configure ta partie de planning poker, définis l'ordre des user stories
+                et choisis le mode de calcul des estimations.
+            </p>
+        </section>
+
+        <!-- Colonne droite -->
+        <section class="hero-card">
+            <div class="session-card">
+                <h2>Paramètres de la session</h2>
+
+                <form id="create-form" method="post">
+
+                    <!-- PSEUDO -->
+                    <div class="form-group">
+                        <label for="organizer">Votre pseudo</label>
+                        <input
+                            id="organizer"
+                            type="text"
+                            name="organizer"
+                            required
+                            placeholder="Ton pseudo"
+                        >
+                    </div>
+
+                    <!-- MODE DE JEU -->
+                    <div class="form-group">
+                        <label for="game_mode">Mode de jeu</label>
+                        <select id="game_mode" name="game_mode">
+                            <option value="strict">Strict (unanimité)</option>
+                            <option value="average">Moyenne</option>
+                            <option value="median">Médiane</option>
+                            <option value="abs">Majorité absolue</option>
+                            <option value="rel">Majorité relative</option>
+                        </select>
+                        <p id="mode-description" class="mode-description hero-small"></p>
+                    </div>
+
+                    <!-- TEMPS PAR US -->
+                    <div class="form-group">
+                        <label for="timePerStory">Durée par user story (minutes)</label>
+                        <input
+                            id="timePerStory"
+                            type="number"
+                            name="timePerStory"
+                            min="1"
+                            value="5"
+                            required
+                        >
+                    </div>
+
+                    <!-- USER STORIES avec drag & drop -->
+                    <div class="form-group">
+                        <label for="userStories-input">User stories à estimer</label>
+                        <input
+                            id="userStories-input"
+                            type="text"
+                            placeholder="Ex : En tant qu’utilisateur, je veux..."
+                        >
+                        <button
+                            type="button"
+                            class="btn btn-ghost full-width btn-add-story"
+                            id="add-story-btn"
+                        >
+                            + Ajouter une user story
+                        </button>
+
+                        <div id="stories-list" class="stories-list"></div>
+
+                        <!-- hidden inputs générés avant submit -->
+                        <div id="stories-hidden"></div>
+                    </div>
+
+                    <!-- AVATAR -->
+                    <div class="form-group avatar-group">
+                        <label>Choisis ton avatar</label>
+                        <p class="hero-small avatar-help-text">
+                            Cet avatar sera utilisé dans la salle d’attente et lors du vote.
+                        </p>
+
+                        <div class="avatar-grid">
+                            {% for seed in avatars %}
+                            <label class="avatar-option">
+                                <input
+                                    type="radio"
+                                    name="avatar_seed"
+                                    value="{{ seed }}"
+                                    {% if loop.first %}checked{% endif %}
+                                >
+                                <img
+                                    src="https://api.dicebear.com/9.x/avataaars/svg?seed={{ seed }}&backgroundColor=b6e3f4&radius=50"
+                                    alt="avatar {{ seed }}"
+                                >
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- SUBMIT -->
+                    <button
+                        type="submit"
+                        class="btn btn-primary full-width btn-submit-create"
+                    >
+                        Créer la session
+                    </button>
+                </form>
+            </div>
+        </section>
+    </div>
+</main>
+
+<!-- JS dans /static/scripts/create.js -->
+<script src="{{ url_for('static', filename='scripts/create.js') }}"></script>
+</body>
+</html>
