@@ -21,6 +21,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # 📁 Create output folder early (needed by Doxygen + JSDoc)
+      - name: Prepare site folder
+        run: |
+          mkdir -p site
+          mkdir -p site/doxygen
+          mkdir -p site/jsdoc
+
       # ---------- Node (pour JSDoc) ----------
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -49,7 +56,6 @@ jobs:
       # ---------- Create a unified homepage ----------
       - name: Create docs homepage
         run: |
-          mkdir -p site
           cat > site/index.html <<'HTML'
           <!doctype html>
           <html lang="fr">
