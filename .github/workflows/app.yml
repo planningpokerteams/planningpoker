@@ -1,0 +1,50 @@
+name: App — checkout & run app
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  app-run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.10
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Write Firebase service account file
+        env:
+          FIREBASE_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          mkdir -p $HOME/.secrets
+          printf '%s' "$FIREBASE_JSON" > $HOME/.secrets/firebase-key.json
+          chmod 600 $HOME/.secrets/firebase-key.json
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Start server and check response
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: $HOME/.secrets/firebase-key.json
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+        run: |
+          nohup python app.py > server.log 2>&1 &
+          sleep 6
+          if curl --fail http://localhost:5000/ -s -o /dev/null; then
+            echo "Server responding on http://localhost:5000/"
+          else
+            echo "Server did not respond — printing last lines of server.log"
+            tail -n 200 server.log || true
+            exit 1
+          fi
+
+      - name: Cleanup secret file
+        if: always()
+        run: |
+          rm -f $HOME/.secrets/firebase-key.json || true
