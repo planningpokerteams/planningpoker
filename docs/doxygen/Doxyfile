@@ -6,31 +6,31 @@ PROJECT_NUMBER         = "1.0"
 
 # Sortie dans un dossier unique pour fusion Doxygen + JSDoc
 OUTPUT_DIRECTORY       = site/doxygen
-CREATE_SUBDIRS         = NO
+CREATE_SUBDIRS         = YES
+
+# Output
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+QUIET                  = YES
 
 # Build-related options
 EXTRACT_ALL            = YES
 EXTRACT_PRIVATE        = YES
 EXTRACT_STATIC         = YES
 EXTRACT_LOCAL_CLASSES  = YES
-QUIET                  = YES
 
-# Input files (adapte selon ton arborescence)
-INPUT                  = app.py \
-                         tests/backend \
-                         static \
-                         scripts \
-                         templates
+# Input files (prend tout le repo, exclusions ci-dessous)
+INPUT                  = .
+RECURSIVE              = YES
 
 FILE_PATTERNS          = *.py \
                          *.js \
                          *.html
-
-RECURSIVE              = YES
 
 # Exclusions propres
 EXCLUDE_PATTERNS       = */node_modules/* \
                          */.git/* \
                          */.venv/* \
                          */venv/* \
-                         */__pycache__/*
+                         */__pycache__/* \
+                         */site/*
