@@ -86,11 +86,11 @@ Jouer en ligne à : https://planningpoker-q3jm.onrender.com/
 Solution 3:
 
 a) Installer et activer un environnement virtuel
-# macOS / Linux
+### macOS / Linux
 python -m venv venv
 source venv/bin/activate
 
-# Windows (PowerShell)
+### Windows (PowerShell)
 python -m venv venv
 .\venv\Scripts\Activate.ps1
 
