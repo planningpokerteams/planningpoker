@@ -1,7 +1,7 @@
 {
   "source": {
-    "include": ["static", "scripts"],
-    "includePattern": ".js$"
+    "include": ["static", "."],
+    "includePattern": ".+\\.js$"
   },
   "opts": {
     "destination": "site/jsdoc",
