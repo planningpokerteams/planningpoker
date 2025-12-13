@@ -1,0 +1,11 @@
+{
+  "source": {
+    "include": ["static", "scripts"],
+    "includePattern": ".js$"
+  },
+  "opts": {
+    "destination": "docs-output",
+    "recurse": true
+  }
+}
+

@@ -1,0 +1,10 @@
+PROJECT_NAME           = "Planning Poker Backend"
+OUTPUT_DIRECTORY       = ../../site/doxygen
+GENERATE_HTML          = YES
+RECURSIVE              = YES
+
+# Python
+INPUT                  = ../../app.py
+FILE_PATTERNS          = *.py
+EXTRACT_ALL            = YES
+QUIET                  = YES
