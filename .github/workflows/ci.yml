@@ -53,15 +53,11 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Install frontend dependencies (with devDependencies)
-        env:
-          NODE_ENV: development
-          NPM_CONFIG_PRODUCTION: "false"
-        run: |
-          npm ci --production=false
-          # debug: vérifier que jest est bien installé
-          npm ls jest
-          ls -la node_modules/.bin | grep jest
+      - name: Configure npm registry (public)
+        run: npm config set registry https://registry.npmjs.org/
+
+      - name: Install frontend dependencies
+        run: npm ci
 
       - name: Run frontend tests (Jest)
         run: npm test
