@@ -2,17 +2,24 @@ name: CI
 
 on:
   push:
+    branches: [ main, develop ]
   pull_request:
+    branches: [ main, develop ]
 
 jobs:
   tests:
     runs-on: ubuntu-latest
 
     steps:
+      # -------------------------------------------------
+      # Checkout
+      # -------------------------------------------------
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # ---------- Backend : Python + Firestore ----------
+      # =================================================
+      # BACKEND — Python / Flask / Firestore
+      # =================================================
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -23,17 +30,17 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Recreate Firebase service account file (base64)
+      # Firebase credentials (safe: Base64)
+      - name: Recreate Firebase service account file
         env:
           FIREBASE_SERVICE_ACCOUNT_B64: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_B64 }}
         run: |
           if [ -z "$FIREBASE_SERVICE_ACCOUNT_B64" ]; then
-            echo "Missing secret FIREBASE_SERVICE_ACCOUNT_B64"
+            echo "Missing FIREBASE_SERVICE_ACCOUNT_B64 secret"
             exit 1
           fi
 
           echo "$FIREBASE_SERVICE_ACCOUNT_B64" | base64 -d > service-account.json
-
           python -c "import json; json.load(open('service-account.json')); print('Firebase JSON OK')"
 
           echo "GOOGLE_APPLICATION_CREDENTIALS=$PWD/service-account.json" >> $GITHUB_ENV
@@ -43,14 +50,16 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}
         run: pytest -q
 
-      # ---------- Frontend : Node + Jest ----------
+      # =================================================
+      # FRONTEND — Node / Jest
+      # =================================================
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: "20"
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: npm ci --include=dev
 
       - name: Run frontend tests (Jest)
-        run: npm test -- --runInBand
+        run: npm test
