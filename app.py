@@ -34,14 +34,32 @@ DEFAULT_SERVICE_ACCOUNT = os.path.join(
 SERVICE_ACCOUNT_FILE = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", DEFAULT_SERVICE_ACCOUNT)
 SERVICE_ACCOUNT_JSON = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
 
+# Support Render Secret Files: /etc/secrets/firebase-key.json
+RENDER_SECRET_FILE = "/etc/secrets/firebase-key.json"
+
 if not firebase_admin._apps:
-    if SERVICE_ACCOUNT_JSON:
-        # Cas Render / env : on passe directement un dict JSON (ne pas écrire sur disque)
-        cred_data = json.loads(SERVICE_ACCOUNT_JSON)
-        cred = credentials.Certificate(cred_data)
-    else:
-        # Cas local : on utilise le fichier de credentials (non versionné)
+    cred = None
+    # 1) Secret file if present (Render)
+    if os.path.exists(RENDER_SECRET_FILE):
+        try:
+            with open(RENDER_SECRET_FILE, "r", encoding="utf-8") as f:
+                cred_data = json.load(f)
+            cred = credentials.Certificate(cred_data)
+        except Exception:
+            cred = None
+    # 2) Env var JSON or path
+    if cred is None and SERVICE_ACCOUNT_JSON:
+        try:
+            cred_data = json.loads(SERVICE_ACCOUNT_JSON)
+            cred = credentials.Certificate(cred_data)
+        except Exception:
+            # If it's actually a file path
+            if os.path.exists(SERVICE_ACCOUNT_JSON):
+                cred = credentials.Certificate(SERVICE_ACCOUNT_JSON)
+    # 3) Local dev file
+    if cred is None:
         cred = credentials.Certificate(SERVICE_ACCOUNT_FILE)
+
     firebase_admin.initialize_app(cred)
 db = firestore.client()
 
