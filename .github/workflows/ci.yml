@@ -70,10 +70,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y doxygen graphviz
 
+      - name: Build documentation output folder
+        run: mkdir -p site
+
       - name: Build Doxygen docs
-        run: |
-          mkdir -p site
-          doxygen docs/doxygen/Doxyfile
+        run: doxygen docs/doxygen/Doxyfile
 
       - name: Build JSDoc docs
         run: npx jsdoc -c docs/jsdoc/jsdoc.json
@@ -83,4 +84,3 @@ jobs:
         with:
           name: documentation
           path: site/
-

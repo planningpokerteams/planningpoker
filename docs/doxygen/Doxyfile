@@ -13,21 +13,25 @@ GENERATE_HTML          = YES
 GENERATE_LATEX         = NO
 QUIET                  = YES
 
-# Build-related options
+# Extraction
 EXTRACT_ALL            = YES
 EXTRACT_PRIVATE        = YES
 EXTRACT_STATIC         = YES
 EXTRACT_LOCAL_CLASSES  = YES
 
-# Input files (prend tout le repo, exclusions ci-dessous)
-INPUT                  = .
-RECURSIVE              = YES
+# Inputs : backend + templates + scripts front
+INPUT                  = app.py \
+                         templates \
+                         static/scripts \
+                         tests/backend
 
 FILE_PATTERNS          = *.py \
                          *.js \
                          *.html
 
-# Exclusions propres
+RECURSIVE              = YES
+
+# Exclusions
 EXCLUDE_PATTERNS       = */node_modules/* \
                          */.git/* \
                          */.venv/* \

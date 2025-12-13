@@ -128,6 +128,46 @@ npm test -- --runInBand
 - requirements.txt — deps Python.
 - package.json + jest.config.cjs — tests front / configuration Node.
 
+📦planningpoker
+📦docs
+ ┣ 📂doxygen
+ ┃ ┗ 📜Doxyfile
+ ┗ 📂jsdoc
+ ┃ ┗ 📜jsdoc.json
+📦asset
+📦static
+ ┣ 📂scripts
+ ┃ ┣ 📜create.js
+ ┃ ┣ 📜vote-utils.js
+ ┃ ┣ 📜vote.js
+ ┃ ┗ 📜waiting.js
+ ┗ 📜styles.css
+📦templates
+ ┣ 📜create.html
+ ┣ 📜index.html
+ ┣ 📜join.html
+ ┣ 📜vote.html
+ ┗ 📜waiting.html
+📦tests
+ ┣ 📂backend
+ ┃ ┗ 📜test_app.py
+ ┣ 📂frontend
+ ┃ ┣ 📜create.test.js
+ ┃ ┣ 📜jest.setup.js
+ ┃ ┣ 📜vote-dom.test.js
+ ┃ ┣ 📜vote-utils.test.js
+ ┃ ┗ 📜waiting.test.js
+ ┗ 📜__init__.py
+ ┣ 📜.gitignore
+ ┣ 📜app.py
+ ┣ 📜jest.config.cjs
+ ┣ 📜package-lock.json
+ ┣ 📜package.json
+ ┣ 📜Procfile
+ ┣ 📜README.md
+ ┣ 📜requirements.txt
+ ┗ 📜start.sh
+ 
 ## 7) Dépannage rapide
 - Erreur « Non autorisé » : vérifiez que vous êtes l’organisateur (même pseudo) et que les cookies sont activés.
 
