@@ -42,6 +42,7 @@
             <div class="session-card">
                 <h2>Paramètres de la session</h2>
 
+                <!-- Formulaire de création classique -->
                 <form id="create-form" method="post">
 
                     <!-- PSEUDO -->
@@ -129,12 +130,41 @@
                         </div>
                     </div>
 
-                    <!-- SUBMIT -->
+                    <!-- SUBMIT création -->
                     <button
                         type="submit"
                         class="btn btn-primary full-width btn-submit-create"
                     >
                         Créer la session
+                    </button>
+                </form>
+
+                <!-- Séparateur visuel -->
+                <hr class="divider">
+
+                <!-- Formulaire séparé pour reprendre une partie depuis un JSON -->
+                <h2>Reprendre une partie existante</h2>
+                <form id="resume-form"
+                      method="post"
+                      action="{{ url_for('resume_from_file') }}"
+                      enctype="multipart/form-data">
+                    <div class="form-group">
+                        <label for="resume-file">Fichier de partie (JSON)</label>
+                        <input
+                            id="resume-file"
+                            type="file"
+                            name="resume_file"
+                            accept="application/json"
+                            required
+                        >
+                        <p class="hero-small">
+                            Sélectionne un fichier JSON exporté depuis une session précédente.
+                            Une nouvelle session sera créée avec cet historique et tu seras
+                            redirigé directement vers la salle d’attente.
+                        </p>
+                    </div>
+                    <button type="submit" class="btn btn-ghost full-width">
+                        Importer la partie et aller à la salle d’attente
                     </button>
                 </form>
             </div>

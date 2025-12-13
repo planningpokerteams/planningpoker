@@ -3,6 +3,7 @@
 // -----------------------------------------------------------
 const { sessionId, currentUser, isOrganizer } = window.GAME_CONFIG || {};
 
+
 // -----------------------------------------------------------
 // Sélection des éléments du DOM (cartes, timer, boutons, etc.)
 // -----------------------------------------------------------
@@ -27,6 +28,15 @@ const historyList    = document.getElementById("history-list");
 const storyTimerEl   = document.getElementById("story-timer");
 const gameStatusText = document.getElementById("game-status-text");
 
+// NOUVEAU : bouton d’export d’état JSON
+const exportBtn    = document.getElementById("export-button");
+const chatButton   = document.getElementById("chat-button");
+const chatPanel    = document.getElementById("chat-panel");
+const chatMessages = document.getElementById("chat-messages");
+const chatInput    = document.getElementById("chat-input");
+const chatSend     = document.getElementById("chat-send");
+
+
 // -----------------------------------------------------------
 // État local côté client (mode de jeu, timer, statut partie…)
 // -----------------------------------------------------------
@@ -38,6 +48,7 @@ let timerStartTimestamp  = null;      // Timestamp de départ du timer (côté s
 let lastStatus           = "waiting"; // Statut courant de la session (waiting, started, paused, finished)
 let timeExpiredHandled   = false;     // Flag pour éviter plusieurs appels /next_story sur la même fin de timer
 
+
 // -----------------------------------------------------------
 // Helpers UI : activer / désactiver toutes les cartes
 // -----------------------------------------------------------
@@ -47,6 +58,7 @@ function setCardsEnabled(enabled) {
         card.classList.toggle("poker-card--disabled", !enabled);
     });
 }
+
 
 // -----------------------------------------------------------
 // Gestion du clic sur une carte (envoi du vote)
@@ -70,6 +82,7 @@ cards.forEach(card => {
     });
 });
 
+
 // -----------------------------------------------------------
 // Placement des joueurs autour de la table (cercle)
 // -----------------------------------------------------------
@@ -90,10 +103,12 @@ function layoutSeats() {
     });
 }
 
+
 // -----------------------------------------------------------
 // Fonctions de calcul sur les votes (moyenne, médiane, majorités…)
 // -----------------------------------------------------------
 const PLANNING_DECK = [1, 2, 3, 5, 8, 13]; // Deck Fibonacci simplifié
+
 
 // Retourne la carte du deck la plus proche d’une valeur numérique
 function nearestCard(value) {
@@ -109,12 +124,14 @@ function nearestCard(value) {
     return best;
 }
 
+
 // Calcul de la moyenne + choix de la carte la plus proche
 function computeAverage(votes) {
     const sum = votes.reduce((a, b) => a + b, 0);
     const avg = sum / votes.length;
     return { avg, card: nearestCard(avg) };
 }
+
 
 // Calcul de la médiane + carte la plus proche
 function computeMedian(votes) {
@@ -128,6 +145,7 @@ function computeMedian(votes) {
     return { median, card: nearestCard(median) };
 }
 
+
 // Compte combien de fois chaque valeur apparaît
 function computeCounts(votes) {
     const counts = {};
@@ -137,9 +155,11 @@ function computeCounts(votes) {
     return counts;
 }
 
+
 // -----------------------------------------------------------
 // Gestion du timer côté client (affichage uniquement)
 // -----------------------------------------------------------
+
 
 // Met à jour la durée totale et le point de départ du timer
 function updateTimerFromData(data) {
@@ -150,6 +170,7 @@ function updateTimerFromData(data) {
         timeExpiredHandled  = false; // nouveau départ de chrono
     }
 }
+
 
 // Met à jour l’affichage du timer toutes les secondes
 function tickStoryTimer() {
@@ -191,8 +212,10 @@ function tickStoryTimer() {
     }
 }
 
+
 // Tick du timer chaque seconde
 setInterval(tickStoryTimer, 1000);
+
 
 // -----------------------------------------------------------
 // Rafraîchissement de l’état de la partie depuis l’API backend
@@ -316,17 +339,25 @@ function refreshGameState() {
                 if (isOrganizer && resumeBtn) {
                     resumeBtn.style.display = "inline-block";
                 }
+
+                // NOUVEAU : bouton d'export visible uniquement en pause café
+                if (isOrganizer && exportBtn) {
+                    exportBtn.style.display = "inline-block";
+                }
+
                 if (nextBtn)      nextBtn.style.display = "none";
                 if (revoteBtn)    revoteBtn.style.display = "none";
+                if (chatButton)   chatButton.style.display = 'none';
                 if (forceNextBtn) forceNextBtn.style.display = "none";
 
                 // On fige le timer côté client pendant la pause
                 timerPerStorySeconds = 0;
                 timerStartTimestamp  = null;
                 return;
-            } else if (resumeBtn) {
-                // Masque le bouton Reprendre dès que la partie repart
-                resumeBtn.style.display = "none";
+            } else {
+                // Dès qu'on n'est plus en pause, on cache les boutons pause
+                if (resumeBtn)  resumeBtn.style.display  = "none";
+                if (exportBtn)  exportBtn.style.display  = "none";
             }
 
             // -------------------------------
@@ -349,6 +380,7 @@ function refreshGameState() {
                 if (revealButton) revealButton.style.display = "none";
                 if (nextBtn)      nextBtn.style.display = "none";
                 if (revoteBtn)    revoteBtn.style.display = "none";
+                if (chatButton)   chatButton.style.display = 'none';
                 if (forceNextBtn) forceNextBtn.style.display = "none";
 
                 return;
@@ -398,6 +430,7 @@ function refreshGameState() {
 
                 if (nextBtn)      nextBtn.style.display = "none";
                 if (revoteBtn)    revoteBtn.style.display = "none";
+                if (chatButton)   chatButton.style.display = 'none';
                 if (forceNextBtn) forceNextBtn.style.display = "none";
 
                 return;
@@ -410,9 +443,20 @@ function refreshGameState() {
                 .map(v => parseInt(v))
                 .filter(Number.isFinite);
 
+            // Priorité : utiliser la décision du backend si disponible.
+            // Le backend expose `unanimous` et `unanimousValue` en tenant
+            // compte de l'ignorance de '?' et '☕'. Sinon, on retombe
+            // sur l'ancienne logique locale.
             let unanimity = false;
-            if (numericVotes.length === allVotesCount && allVotesCount > 0) {
-                unanimity = numericVotes.every(v => v === numericVotes[0]);
+            let unanimousValue = null;
+            if (typeof data.unanimous !== 'undefined') {
+                unanimity = !!data.unanimous;
+                unanimousValue = data.unanimousValue;
+            } else {
+                if (numericVotes.length === allVotesCount && allVotesCount > 0) {
+                    unanimity = numericVotes.every(v => v === numericVotes[0]);
+                    if (unanimity) unanimousValue = numericVotes[0];
+                }
             }
 
             const strictModeAlways = (lastGameMode === "strict");
@@ -440,6 +484,7 @@ function refreshGameState() {
                     tableStatus.textContent =
                         "❌ Pas d'unanimité (mode strict). Discutez et relancez un vote.";
                     if (isOrganizer && revoteBtn) revoteBtn.style.display = "block";
+                    if (chatButton) chatButton.style.display = 'inline-block';
                     if (nextBtn)      nextBtn.style.display = "none";
                     if (forceNextBtn) forceNextBtn.style.display = "none";
                 }
@@ -450,6 +495,7 @@ function refreshGameState() {
                     tableStatus.textContent =
                         "Les joueurs n'ont pas choisi de valeur numérique (café / ?).";
                     if (isOrganizer && revoteBtn) revoteBtn.style.display = "block";
+                    if (chatButton) chatButton.style.display = 'inline-block';
                     if (nextBtn)      nextBtn.style.display = "none";
                     if (forceNextBtn) forceNextBtn.style.display = "none";
                     return;
@@ -519,12 +565,14 @@ function refreshGameState() {
                         `✅ Résultat (${label}) : ${result}. ${message}`;
                     if (isOrganizer && nextBtn)   nextBtn.style.display = "block";
                     if (isOrganizer && revoteBtn) revoteBtn.style.display = "block";
+                    if (chatButton) chatButton.style.display = 'inline-block';
                     if (forceNextBtn)             forceNextBtn.style.display = "none";
                 } else {
                     // Aucun résultat automatique fiable
                     lastComputedResult = null;
                     tableStatus.textContent = `❌ ${message}`;
                     if (isOrganizer && revoteBtn) revoteBtn.style.display = "block";
+                    if (chatButton) chatButton.style.display = 'inline-block';
                     if (nextBtn)      nextBtn.style.display = "none";
                     if (forceNextBtn) forceNextBtn.style.display = "none";
                 }
@@ -532,10 +580,71 @@ function refreshGameState() {
         });
 }
 
+
 // Rafraîchissement régulier de l’état de la partie
 setInterval(refreshGameState, 2000);
 refreshGameState();
 window.addEventListener("resize", layoutSeats);
+
+// -------------------------------
+// Chat : polling, envoi, affichage
+// -------------------------------
+function renderChatMessages(msgs) {
+    if (!chatMessages) return;
+    chatMessages.innerHTML = msgs.map(m => {
+        const t = new Date((m.ts || 0) * 1000).toLocaleTimeString();
+        return `<div class="chat-line"><strong>${escapeHtml(m.sender)}:</strong> ${escapeHtml(m.text)} <span class="chat-ts">${t}</span></div>`;
+    }).join("");
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function escapeHtml(s) {
+    if (!s) return "";
+    return String(s).replace(/[&<>\"']/g, function (c) {
+        return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c];
+    });
+}
+
+let lastChatFetch = 0;
+function fetchChat() {
+    if (!chatPanel || chatPanel.style.display === 'none') return;
+    // throttle
+    const now = Date.now();
+    if (now - lastChatFetch < 1000) return;
+    lastChatFetch = now;
+    fetch(`/api/chat/${sessionId}`).then(r => r.json()).then(data => {
+        if (!data || !data.messages) return;
+        renderChatMessages(data.messages || []);
+    }).catch(()=>{});
+}
+
+if (chatSend) {
+    chatSend.addEventListener('click', () => {
+        const text = chatInput && chatInput.value && chatInput.value.trim();
+        if (!text) return;
+        fetch(`/api/chat/${sessionId}`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({text})
+        }).then(r => {
+            if (r.ok) {
+                if (chatInput) chatInput.value = '';
+                fetchChat();
+            }
+        }).catch(()=>{});
+    });
+    // send on Enter
+    if (chatInput) {
+        chatInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); chatSend.click(); }
+        });
+    }
+}
+
+// Poll chat regularly
+setInterval(fetchChat, 2000);
+
+// (chat visibility is controlled inline in refreshGameState)
+
 
 // -----------------------------------------------------------
 // Actions de l’organisateur (next story, revote, reprise pause)
@@ -553,7 +662,12 @@ if (nextBtn) {
 if (revoteBtn) {
     revoteBtn.addEventListener("click", () => {
         fetch(`/revote/${sessionId}`, { method: "POST" })
-            .then(() => refreshGameState());
+            .then(() => {
+                // Lorsqu'on relance le vote, fermer le chat
+                if (chatPanel) chatPanel.style.display = 'none';
+                if (chatButton) chatButton.style.display = 'none';
+                refreshGameState();
+            });
     });
 }
 
@@ -561,5 +675,17 @@ if (resumeBtn) {
     resumeBtn.addEventListener("click", () => {
         fetch(`/resume/${sessionId}`, { method: "POST" })
             .then(() => refreshGameState());
+    });
+}
+
+if (chatButton) {
+    chatButton.addEventListener('click', () => {
+        if (!chatPanel) return;
+        const isHidden = chatPanel.style.display === 'none' || !chatPanel.style.display;
+        chatPanel.style.display = isHidden ? 'block' : 'none';
+        if (isHidden) {
+            fetchChat();
+            if (chatInput) chatInput.focus();
+        }
     });
 }

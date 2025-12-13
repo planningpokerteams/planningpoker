@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ---------- Backend : Python + Firestore ----------
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Recreate Firebase service account file
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          # On recrée le fichier JSON à partir du secret GitHub
+          echo "$FIREBASE_SERVICE_ACCOUNT_JSON" > pokerplanning-749a9-firebase-adminsdk-fbsvc-10f7d5cc49.json
+          # On indique ce chemin à app.py via une variable d'environnement
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$PWD/pokerplanning-749a9-firebase-adminsdk-fbsvc-10f7d5cc49.json" >> $GITHUB_ENV
+
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run backend tests (pytest)
+        run: pytest
+
+      # ---------- Frontend : Node + Jest ----------
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Run frontend tests (Jest)
+        run: npm test

@@ -11,30 +11,38 @@ import json
 import firebase_admin
 from firebase_admin import credentials, firestore
 
+
+
 # ---------------------------------------------------------
 # Initialisation Flask
 # ---------------------------------------------------------
 app = Flask(__name__)
-# Clé secrète pour la session côté serveur (à remplacer en prod)
-app.secret_key = "une_grosse_chaine_aleatoire_que_tu_genere"
+# Clé secrète : utiliser SECRET_KEY en prod, sinon valeur de dev
+app.secret_key = os.environ.get("SECRET_KEY", "une_grosse_chaine_aleatoire_que_tu_genere")
 
 # ---------------------------------------------------------
 # Chemins locaux (projet, credentials Firebase, assets SVG)
 # ---------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-SERVICE_ACCOUNT_FILE = os.path.join(
+ASSET_FOLDER = os.path.join(BASE_DIR, "asset")
+
+# On accepte soit un chemin fourni par l'env, soit le fichier local (dev)
+DEFAULT_SERVICE_ACCOUNT = os.path.join(
     BASE_DIR,
     "pokerplanning-749a9-firebase-adminsdk-fbsvc-10f7d5cc49.json"
 )
-ASSET_FOLDER = os.path.join(BASE_DIR, "asset")
+SERVICE_ACCOUNT_FILE = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", DEFAULT_SERVICE_ACCOUNT)
+SERVICE_ACCOUNT_JSON = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
 
-# ---------------------------------------------------------
-# Initialisation Firebase / Firestore
-# ---------------------------------------------------------
 if not firebase_admin._apps:
-    cred = credentials.Certificate(SERVICE_ACCOUNT_FILE)
+    if SERVICE_ACCOUNT_JSON:
+        # Cas Render / env : on passe directement un dict JSON (ne pas écrire sur disque)
+        cred_data = json.loads(SERVICE_ACCOUNT_JSON)
+        cred = credentials.Certificate(cred_data)
+    else:
+        # Cas local : on utilise le fichier de credentials (non versionné)
+        cred = credentials.Certificate(SERVICE_ACCOUNT_FILE)
     firebase_admin.initialize_app(cred)
-
 db = firestore.client()
 
 # ---------------------------------------------------------
@@ -70,6 +78,7 @@ def generate_session_id():
 def asset_file(filename):
     return send_from_directory(ASSET_FOLDER, filename)
 
+
 # ---------------------------------------------------------
 # Page d’accueil (landing / choix créer ou rejoindre)
 # ---------------------------------------------------------
@@ -83,33 +92,66 @@ def index():
 @app.route('/create', methods=['GET', 'POST'])
 def create():
     if request.method == 'POST':
-        # Récupération des champs du formulaire de création
         organizer = request.form['organizer']
         user_stories = request.form.getlist('userStories')
         avatar_seed = request.form.get('avatar_seed', AVATAR_SEEDS[0])
         game_mode = request.form.get('game_mode', 'strict')
         time_per_story = int(request.form.get('timePerStory', 5))
 
-        # Création d’un nouvel identifiant de session
+        # Nouveau : fichier JSON optionnel pour reprendre une partie
+        resume_file = request.files.get('resume_file')
+        imported_state = None
+        if resume_file and resume_file.filename:
+            try:
+                imported_state = json.load(resume_file.stream)
+            except Exception:
+                imported_state = None  # en vrai, tu pourrais afficher un message d'erreur
+
         session_id = generate_session_id()
         session_ref = db.collection('sessions').document(session_id)
 
-        # État initial de la session dans Firestore
-        session_ref.set({
-            "organizer": organizer,
-            "status": "waiting",              # salle d’attente
-            "userStories": user_stories,
-            "currentStoryIndex": 0,
-            "reveal": False,
-            "final_result": None,
-            "history": [],                    # historique des stories jouées
-            "gameMode": game_mode,            # strict / average / median / abs / rel
-            "round_number": 1,
-            "timePerStory": time_per_story,   # minutes
-            "timerStart": None                # timestamp de départ par story
-        })
+        if imported_state:
+            # On utilise ce qui vient du JSON pour préremplir la session
+            data = imported_state
+            session_ref.set({
+                "organizer": organizer,  # le nouvel organisateur
+                "status": "waiting",     # on repart toujours en attente
+                "userStories": data.get("userStories", user_stories) or user_stories,
+                "currentStoryIndex": data.get("currentStoryIndex", 0),
+                "reveal": False,
+                "final_result": None,
+                "history": data.get("history", []),
+                "gameMode": data.get("gameMode", game_mode),
+                "round_number": data.get("round_number", 1),
+                "timePerStory": data.get("timePerStory", time_per_story),
+                "timerStart": None,
+            })
 
-        # Ajout de l’organisateur comme premier participant
+            # Recréer les participants de l'ancienne partie
+            for p in data.get("participants", []):
+                session_ref.collection("participants").add({
+                    "name": p.get("name"),
+                    "vote": p.get("vote"),
+                    "avatarSeed": p.get("avatarSeed", AVATAR_SEEDS[0]),
+                    "hasVoted": p.get("hasVoted", False),
+                })
+        else:
+            # Comportement actuel (création d'une nouvelle partie vierge)
+            session_ref.set({
+                "organizer": organizer,
+                "status": "waiting",
+                "userStories": user_stories,
+                "currentStoryIndex": 0,
+                "reveal": False,
+                "final_result": None,
+                "history": [],
+                "gameMode": game_mode,
+                "round_number": 1,
+                "timePerStory": time_per_story,
+                "timerStart": None,
+            })
+
+        # Dans tous les cas, ajouter l'organisateur comme participant
         session_ref.collection("participants").add({
             "name": organizer,
             "vote": None,
@@ -117,15 +159,12 @@ def create():
             "hasVoted": False
         })
 
-        # Mémorisation côté session Flask (pour lier navigateur ↔ session Firestore)
         session["username"] = organizer
         session["session_id"] = session_id
         session["avatarSeed"] = avatar_seed
 
-        # Redirection vers la salle d’attente de la nouvelle session
         return redirect(url_for('waiting', session_id=session_id))
 
-    # GET : affichage du formulaire de création
     return render_template("create.html", avatars=AVATAR_SEEDS)
 
 # ---------------------------------------------------------
@@ -222,16 +261,16 @@ def start(session_id):
     for p in session_ref.collection("participants").stream():
         p.reference.update({"vote": None, "hasVoted": False})
 
-    # Mise à jour de l’état de la partie
+    # IMPORTANT : on ne change plus currentStoryIndex ici
     session_ref.update({
         "status": "started",
-        "currentStoryIndex": 0,
         "reveal": False,
         "round_number": 1,
-        "timerStart": int(time.time())
+        "timerStart": int(time.time()),
     })
 
     return redirect(url_for("vote", session_id=session_id))
+
 
 # ---------------------------------------------------------
 # VOTE PAGE : écran principal de vote (tous les joueurs)
@@ -264,8 +303,23 @@ def vote(session_id):
         return redirect(url_for("vote", session_id=session_id))
 
     # GET : affichage de la table de vote
-    participants = [p.to_dict()
-                    for p in session_ref.collection('participants').stream()]
+    # Construire la liste des participants en masquant les votes des autres
+    participants_full = [p.to_dict() for p in session_ref.collection('participants').stream()]
+    is_organizer = (username == data.get("organizer"))
+    participants = []
+    for p in participants_full:
+        sanitized = {
+            "name": p.get("name"),
+            "avatarSeed": p.get("avatarSeed"),
+            "hasVoted": p.get("hasVoted", False),
+        }
+        # On n'expose la valeur du vote que si les cartes sont révélées,
+        # ou si l'utilisateur courant est l'organisateur, ou si c'est le joueur lui-même
+        if data.get("reveal", False) or is_organizer or p.get("name") == username:
+            sanitized["vote"] = p.get("vote")
+        else:
+            sanitized["vote"] = None
+        participants.append(sanitized)
 
     return render_template(
         "vote.html",
@@ -273,7 +327,7 @@ def vote(session_id):
         participants=participants,
         session_id=session_id,
         current_user=username,
-        is_organizer=(username == data.get("organizer")),
+        is_organizer=is_organizer,
         cards=CARDS
     )
 
@@ -315,17 +369,48 @@ def api_game(session_id):
     current_story = stories[idx] if 0 <= idx < len(stories) else ""
 
     participants_snap = list(session_ref.collection("participants").stream())
-    participants = [p.to_dict() for p in participants_snap]
+    participants_full = [p.to_dict() for p in participants_snap]
 
-    # all_voted : tout le monde a déposé un vote (hors café / ?)
-    all_voted = True
-    # all_cafe : tout le monde a explicitement joué ☕
-    all_cafe  = bool(participants)
-    for p in participants:
-        if p.get("vote") is None:
-            all_voted = False
-        if p.get("vote") != "☕":
-            all_cafe = False
+    # Contexte de l'appel (qui demande l'état)
+    current_user = session.get("username")
+    is_current_organizer = (current_user == data.get("organizer"))
+
+    # Votes bruts
+    votes_raw = [p.get("vote") for p in participants_full]
+
+    # all_cafe : vrai seulement si TOUT le monde a mis ☕
+    all_cafe = bool(participants_full) and all(v == "☕" for v in votes_raw)
+
+    # all_voted : vrai si personne n'a laissé la valeur à None.
+    # Ici on considère que '?' et '☕' sont des actions (donc comptent comme "a voté").
+    all_voted = all(v is not None for v in votes_raw)
+
+    # Unanimité : on ignore '?' et '☕' pour décider si les votes restants sont identiques.
+    non_ignored_votes = [v for v in votes_raw if v is not None and v not in ("?", "☕")]
+    unanimous = False
+    unanimous_value = None
+    if non_ignored_votes:
+        if all(x == non_ignored_votes[0] for x in non_ignored_votes):
+            unanimous = True
+            unanimous_value = non_ignored_votes[0]
+
+    # Construire la liste renvoyée au front en MASQUANT les votes des autres
+    participants = []
+    for p in participants_full:
+        sanitized = {
+            "name": p.get("name"),
+            "avatarSeed": p.get("avatarSeed", AVATAR_SEEDS[0]),
+            "hasVoted": p.get("hasVoted", False),
+        }
+        # On n'expose la valeur du vote que si :
+        # - les cartes sont révélées, ou
+        # - l'appelant est l'organisateur, ou
+        # - l'appelant est le joueur lui-même
+        if data.get("reveal", False) or is_current_organizer or p.get("name") == current_user:
+            sanitized["vote"] = p.get("vote")
+        else:
+            sanitized["vote"] = None
+        participants.append(sanitized)
 
     # Gestion de la pause café : si tout le monde est sur ☕
     if all_cafe and data.get("status") not in ("finished", "paused"):
@@ -355,6 +440,8 @@ def api_game(session_id):
         "participants": participants,
         "allVoted": all_voted,
         "allCafe": all_cafe,
+        "unanimous": unanimous,
+        "unanimousValue": unanimous_value,
         "reveal": data.get("reveal", False),
         "currentStory": current_story,
         "history": data.get("history", []),
@@ -446,6 +533,52 @@ def next_story(session_id):
         "votes": all_votes
     })
 
+    # Si le front n'a pas envoyé de 'result', on peut le calculer ici en
+    # ignorant les votes '?' et les cafés '☕' (sauf si tout le monde a mis ☕).
+    if result is None:
+        # Récupérer les votes bruts pour décider
+        votes_raw = [v.get("vote") for v in all_votes]
+
+        # Détecter si tout le monde a mis café
+        all_cafe = bool(votes_raw) and all(v == "☕" for v in votes_raw)
+
+        # Construire la liste de valeurs numériques à agréger en ignorant
+        # '?' et '☕' (si ce n'est pas le cas où tout le monde a mis ☕)
+        numeric_votes = []
+        for v in votes_raw:
+            if v is None:
+                continue
+            if v == "?":
+                # Ignoré dans l'agrégation (considéré comme "nul", 0 influence)
+                continue
+            if v == "☕":
+                # Si tout le monde a mis café, on ne peut pas calculer de valeur
+                # numérique utile -> on laisse result comme None
+                if all_cafe:
+                    numeric_votes = []
+                    break
+                else:
+                    # Ignorer les cafés individuels si pas unanimité
+                    continue
+            # Tenter de convertir en nombre
+            try:
+                num = float(v)
+                numeric_votes.append(num)
+            except Exception:
+                continue
+
+        # Calculer une moyenne si on a des votes numériques
+        if numeric_votes:
+            avg = sum(numeric_votes) / len(numeric_votes)
+            # Arrondir à l'entier le plus proche pour rester consistant avec les cartes
+            result = int(round(avg))
+        else:
+            # Pas de vote numérique significatif -> on garde None
+            result = None
+
+        # Mettre à jour l'historique dernier élément avec le résultat calculé
+        history[-1]["result"] = result
+
     update_payload = {
         "history": history
     }
@@ -506,17 +639,99 @@ def revote(session_id):
 
     return jsonify({"status": "ok"})
 
+
+# ---------------------------------------------------------
+# CHAT API : stocke et lit les messages de chat pour une session
+# ---------------------------------------------------------
+@app.route('/api/chat/<session_id>', methods=['GET', 'POST'])
+def api_chat(session_id):
+    session_ref = db.collection('sessions').document(session_id)
+    snapshot = session_ref.get()
+    if not snapshot.exists:
+        return jsonify({"error": "not_found"}), 404
+
+    # POST -> ajouter un message
+    if request.method == 'POST':
+        username = session.get('username')
+        if not username:
+            return jsonify({"error": "not_authenticated"}), 401
+
+        data = request.get_json(silent=True) or {}
+        text = data.get('text', '').strip()
+        if not text:
+            return jsonify({"error": "empty"}), 400
+
+        chat_ref = session_ref.collection('chat')
+        chat_ref.add({
+            'sender': username,
+            'text': text,
+            'ts': int(time.time())
+        })
+        return jsonify({"status": "ok"}), 201
+
+    # GET -> renvoyer les derniers messages (limit 200)
+    msgs = []
+    for doc in session_ref.collection('chat').order_by('ts').limit(200).stream():
+        d = doc.to_dict()
+        msgs.append({
+            'sender': d.get('sender'),
+            'text': d.get('text'),
+            'ts': d.get('ts')
+        })
+
+    return jsonify({"messages": msgs})
+
 # ---------------------------------------------------------
 # DOWNLOAD RESULTS : export JSON complet de la session
 # ---------------------------------------------------------
-@app.route('/download_results/<session_id>')
-def download_results(session_id):
+@app.route('/export_state/<session_id>')
+def export_state(session_id):
     session_ref = db.collection("sessions").document(session_id)
     snapshot = session_ref.get()
     if not snapshot.exists:
         return "Session introuvable", 404
 
     data = snapshot.to_dict() or {}
+
+    # Récupérer les participants actuels
+    participants_snap = list(session_ref.collection("participants").stream())
+    participants = [p.to_dict() for p in participants_snap]
+
+    export = {
+        "schemaVersion": 1,
+        "sessionId": session_id,
+        "organizer": data.get("organizer"),
+        "status": data.get("status"),
+        "gameMode": data.get("gameMode"),
+        "timePerStory": data.get("timePerStory"),
+        "userStories": data.get("userStories", []),
+        "currentStoryIndex": data.get("currentStoryIndex", 0),
+        "round_number": data.get("round_number", 1),
+        "history": data.get("history", []),
+        "participants": participants,
+    }
+
+    json_str = json.dumps(export, ensure_ascii=False, indent=2)
+    filename = f"poker_state_{session_id}.json"
+
+    return Response(
+        json_str,
+        mimetype="application/json",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}"
+        },
+    )
+
+@app.route('/download_results/<session_id>')
+def download_results(session_id):
+    """Exporter les résultats finaux de la session (format plus simple)."""
+    session_ref = db.collection("sessions").document(session_id)
+    snapshot = session_ref.get()
+    if not snapshot.exists:
+        return "Session introuvable", 404
+
+    data = snapshot.to_dict() or {}
+
     export = {
         "sessionId": session_id,
         "organizer": data.get("organizer"),
@@ -524,20 +739,143 @@ def download_results(session_id):
         "gameMode": data.get("gameMode"),
         "timePerStory": data.get("timePerStory"),
         "userStories": data.get("userStories", []),
-        "history": data.get("history", [])
+        "history": data.get("history", []),
     }
 
     json_str = json.dumps(export, ensure_ascii=False, indent=2)
     filename = f"poker_results_{session_id}.json"
 
-    # Réponse HTTP permettant le téléchargement du fichier JSON
     return Response(
         json_str,
         mimetype="application/json",
         headers={
             "Content-Disposition": f"attachment; filename={filename}"
-        }
+        },
     )
+
+@app.route('/resume_from_file', methods=['POST'])
+def resume_from_file():
+    resume_file = request.files.get('resume_file')
+    if not resume_file or not resume_file.filename:
+        return redirect(url_for('create'))
+
+    try:
+        imported_state = json.load(resume_file.stream)
+    except Exception:
+        return "Fichier JSON invalide", 400
+
+    data = imported_state or {}
+    stories = data.get("userStories", [])
+    history = data.get("history", [])
+
+    # Nombre de stories déjà jouées
+    completed_count = len(history)
+
+    # Calcul du nouvel index de story
+    if completed_count >= len(stories):
+        # Toutes les stories ont déjà été jouées -> partie finie
+        new_status = "finished"
+        new_index = max(0, len(stories) - 1)
+    else:
+        # On reprend sur la première story non encore dans l'historique
+        new_status = "waiting"
+        new_index = completed_count
+
+    session_id = generate_session_id()
+    session_ref = db.collection('sessions').document(session_id)
+
+    organizer = data.get("organizer", "Organisateur")
+
+    # Avatar de l'organisateur (si présent dans les anciens participants)
+    avatar_seed = AVATAR_SEEDS[0]
+    for p in data.get("participants", []):
+        if p.get("name") == organizer:
+            avatar_seed = p.get("avatarSeed", AVATAR_SEEDS[0])
+            break
+
+    session_ref.set({
+        "organizer": organizer,
+        "status": new_status,
+        "userStories": stories,
+        "currentStoryIndex": new_index,
+        "reveal": False,
+        "final_result": None,
+        "history": history,             # on garde l'historique pour la colonne de gauche
+        "gameMode": data.get("gameMode", "strict"),
+        "round_number": data.get("round_number", 1),
+        "timePerStory": data.get("timePerStory", 5),
+        "timerStart": None,
+    })
+
+    # On NE recrée que l'organisateur comme participant actif
+    session_ref.collection("participants").add({
+        "name": organizer,
+        "vote": None,
+        "avatarSeed": avatar_seed,
+        "hasVoted": False,
+    })
+
+    session["username"] = organizer
+    session["session_id"] = session_id
+    session["avatarSeed"] = avatar_seed
+
+    return redirect(url_for('waiting', session_id=session_id))
+
+    """Créer une nouvelle session à partir d'un fichier JSON exporté."""
+    resume_file = request.files.get('resume_file')
+    if not resume_file or not resume_file.filename:
+        return redirect(url_for('create'))
+
+    try:
+        imported_state = json.load(resume_file.stream)
+    except Exception:
+        return "Fichier JSON invalide", 400
+
+    data = imported_state or {}
+
+    session_id = generate_session_id()
+    session_ref = db.collection('sessions').document(session_id)
+
+    # On récupère l'organisateur d'origine
+    organizer = data.get("organizer", "Organisateur")
+
+    # On essaie de retrouver son avatar dans la liste des anciens participants
+    avatar_seed = AVATAR_SEEDS[0]
+    for p in data.get("participants", []):
+        if p.get("name") == organizer:
+            avatar_seed = p.get("avatarSeed", AVATAR_SEEDS[0])
+            break
+
+    # Création de la nouvelle session à partir de l'état importé
+    session_ref.set({
+        "organizer": organizer,
+        "status": "waiting",  # on repart en salle d'attente
+        "userStories": data.get("userStories", []),
+        "currentStoryIndex": data.get("currentStoryIndex", 0),
+        "reveal": False,
+        "final_result": None,
+        "history": data.get("history", []),  # conserve les votes passés
+        "gameMode": data.get("gameMode", "strict"),
+        "round_number": data.get("round_number", 1),
+        "timePerStory": data.get("timePerStory", 5),
+        "timerStart": None,
+    })
+
+    # IMPORTANT : on ne recrée QUE l'organisateur comme participant actif
+    session_ref.collection("participants").add({
+        "name": organizer,
+        "vote": None,
+        "avatarSeed": avatar_seed,
+        "hasVoted": False,
+    })
+
+    # On connecte l'organisateur à cette nouvelle session
+    session["username"] = organizer
+    session["session_id"] = session_id
+    session["avatarSeed"] = avatar_seed
+
+    # Direction la salle d'attente directement
+    return redirect(url_for('waiting', session_id=session_id))
 
 # ---------------------------------------------------------
 # Point d’entrée de l’application Flask (mode debug dev)

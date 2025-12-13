@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="fr">
+
 <head>
     <meta charset="UTF-8">
     <title>Phase de jeu</title>
@@ -24,8 +25,6 @@
 
             <nav class="nav-links">
                 <a href="/">Accueil</a>
-                <a href="/create">Créer une session</a>
-                <a href="/join">Rejoindre</a>
             </nav>
 
             <div class="nav-actions">
@@ -49,8 +48,8 @@
         <section class="game-header" style="text-align:center; margin-top:24px;">
             {% set initial_story = "" %}
             {% if session.userStories and session.userStories|length > 0 %}
-                {% set idx = session.currentStoryIndex|default(0) %}
-                {% set initial_story = session.userStories[idx] %}
+            {% set idx = session.currentStoryIndex|default(0) %}
+            {% set initial_story = session.userStories[idx] %}
             {% endif %}
             <h1 id="story-text" class="big-story-text" style="margin:0; font-size:1.4rem; color:#0f172a;">
                 {{ initial_story or "Aucune user story définie" }}
@@ -77,13 +76,8 @@
         <section class="game-actions">
 
             {% if is_organizer %}
-            <form id="reveal-form"
-                  method="post"
-                  action="{{ url_for('reveal', session_id=session_id) }}">
-                <button id="reveal-button"
-                        type="submit"
-                        class="btn btn-primary reveal-btn"
-                        style="display:none;">
+            <form id="reveal-form" method="post" action="{{ url_for('reveal', session_id=session_id) }}">
+                <button id="reveal-button" type="submit" class="btn btn-primary reveal-btn" style="display:none;">
                     Révéler les cartes
                 </button>
             </form>
@@ -93,62 +87,75 @@
             <p id="game-status-text" class="hero-small vote-status-text" style="display:none;"></p>
 
             {% if is_organizer %}
-            <button id="next-button"
-                    class="btn btn-primary gm-action"
-                    style="display:none;">
+            <button id="next-button" class="btn btn-primary gm-action" style="display:none;">
                 Passer à la user story suivante
             </button>
 
-            <button id="revote-button"
-                    class="btn btn-secondary gm-action"
-                    style="display:none;">
+
+            <button id="revote-button" class="btn btn-secondary gm-action" style="display:none;">
                 Relancer le vote
             </button>
 
-            <button id="force-next-button"
-                    class="btn btn-danger gm-action"
-                    style="display:none;">
+            <button id="force-next-button" class="btn btn-danger gm-action" style="display:none;">
                 Passer quand même
             </button>
 
             <!-- bouton pour reprendre après la pause café -->
-            <button id="resume-button"
-                    class="btn btn-success gm-action"
-                    style="display:none;">
+            <button id="resume-button" class="btn btn-success gm-action" style="display:none;">
                 Reprendre la partie
             </button>
+
+            <!-- Bouton UNIQUE d'export d'état JSON (visible seulement en pause café) -->
+            <!-- Bouton UNIQUE d'export d'état JSON (visible seulement en pause café) -->
+            <a id="export-button" class="btn btn-ghost gm-action" style="display:none;"
+                href="{{ url_for('export_state', session_id=session_id) }}">
+                Exporter l'état de la partie (JSON)
+            </a>
+
             {% endif %}
+
+            <!-- Bouton chat visible pour tous quand une relance est demandée -->
+            <button id="chat-button" class="btn btn-ghost gm-action" style="display:none;">
+                Ouvrir le chat de la session
+            </button>
 
             <!-- CARTES -->
             <form id="vote-form" method="post">
                 <input type="hidden" name="vote" id="vote-input">
                 <div class="cards-row cards-row-big">
                     {% for card in cards %}
-                    <button type="button"
-                            class="poker-card poker-card-big"
-                            data-value="{{ card.value }}">
-                        <img class="poker-card-img"
-                             src="{{ url_for('asset_file', filename=card.file) }}"
-                             alt="Carte {{ card.value }}">
+                    <button type="button" class="poker-card poker-card-big" data-value="{{ card.value }}">
+                        <img class="poker-card-img" src="{{ url_for('asset_file', filename=card.file) }}"
+                            alt="Carte {{ card.value }}">
                     </button>
                     {% endfor %}
                 </div>
             </form>
+
+            <!-- PANEL CHAT (hidden par défaut) -->
+            <div id="chat-panel" class="chat-panel" style="display:none; margin-top:12px;">
+                <div id="chat-messages" class="chat-messages" style="max-height:240px; overflow:auto; background:#fff; padding:8px; border:1px solid #e5e7eb; border-radius:6px;">
+                </div>
+                <div style="display:flex; gap:8px; margin-top:8px;">
+                    <input id="chat-input" type="text" placeholder="Écrire un message…" style="flex:1; padding:8px; border:1px solid #cbd5e1; border-radius:6px;">
+                    <button id="chat-send" class="btn btn-primary">Envoyer</button>
+                </div>
+            </div>
 
         </section>
 
     </main>
 
     <!-- on passe les infos dynamiques au JS statique -->
-<script>
-    window.GAME_CONFIG = {
-        sessionId: "{{ session_id }}",
-        currentUser: "{{ current_user }}",
-        isOrganizer: "{{ 'true' if is_organizer else 'false' }}"
-    };
-</script>
-<script src="{{ url_for('static', filename='scripts/vote.js') }}"></script>
+    <script>
+        window.GAME_CONFIG = {
+            sessionId: "{{ session_id }}",
+            currentUser: "{{ current_user }}",
+            isOrganizer: "{{ 'true' if is_organizer else 'false' }}"
+        };
+    </script>
+    <script src="{{ url_for('static', filename='scripts/vote.js') }}"></script>
 
 </body>
-</html>
 
+</html>

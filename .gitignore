@@ -1,4 +1,30 @@
 venv/
-.env/
-env/
 .venv/
+env/
+.env/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.pyo
+*.pyd
+
+# Node
+node_modules/
+package-lock.json
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Credentials
+pokerplanning-*-firebase-adminsdk-*.json
+*.key
+*.pem
+*.p12
+
+# Builds / dist
+dist/
+build/
+*.log
