@@ -34,8 +34,8 @@ else
 fi
 
 echo ">>> Installation des dépendances"
-pip install --upgrade pip
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
+
 
 echo ">>> Lancement de l'application Flask"
 python app.py

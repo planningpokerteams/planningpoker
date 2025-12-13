@@ -78,7 +78,7 @@ Table des matières
 - Projet Firebase/Firestore et clé de compte de service (JSON) si vous utilisez la persistance Firestore.
 
 Solution 1 : 
-Lancer le  (`start.sh`) pour préparer l’environnement et lancer l’app en développement depuis GIT BASH.
+Lancer `./start.sh` pour préparer l’environnement et lancer l’app en développement depuis GIT BASH.
 
 Solution 2 :
 Jouer en ligne à : https://planningpoker-q3jm.onrender.com/

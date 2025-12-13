@@ -61,3 +61,32 @@ jobs:
 
       - name: Run frontend tests (Jest)
         run: npm test
+      # =================================================
+              # DOCUMENTATION — Doxygen + JSDoc
+      # =================================================
+      - name: Install Doxygen
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y doxygen graphviz
+
+      - name: Build Doxygen docs
+        run: |
+          mkdir -p docs/doxygen
+          doxygen Doxyfile
+
+      - name: Build JSDoc docs
+        run: |
+          mkdir -p docs/jsdoc
+          npm run docs:js
+
+      - name: Upload Doxygen HTML
+        uses: actions/upload-artifact@v4
+        with:
+          name: doxygen-html
+          path: docs/doxygen/html
+
+      - name: Upload JSDoc HTML
+        uses: actions/upload-artifact@v4
+        with:
+          name: jsdoc-html
+          path: docs/jsdoc
