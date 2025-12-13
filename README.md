@@ -1,107 +1,134 @@
-# Planning Poker – Application d’estimation agile
+# Planning Poker — Iliana & Ruth
 
-Application web de Planning Poker permettant à une équipe de faire des estimations d’user stories en temps réel.  
-Le backend est développé avec Flask et Firestore, et le frontend en HTML / CSS / JavaScript.
+Une application Planning Poker en ligne p créee par ABEBE NEGUSSIE Ruth et BENCHIKH Iliana (Groupe H), pour estimer des user stories en équipe. Développée en binôme avec pair programming et intégration continue. L’app permet de créer des parties, voter anonymement, discuter, exporter/importer l’état et reprendre une partie.
 
----
+Démo
+- URL : https://planningpoker-q3jm.onrender.com/  
+  Note : sur le plan gratuit Render, l’application peut prendre quelques secondes à « se réveiller ».
 
-## Fonctionnalités principales
+Table des matières
+- Fonctionnalités
+- Règles de jeu et comportements
+- Format JSON (import/export)
+- Installation & exécution locale (quick start)
+- Tests (backend & frontend)
+- Organisation du projet (arborescence)
+- Dépannage rapide
 
-- Création d’une partie avec un organisateur et une liste d’user stories.  
-- Rejoindre une partie via un code de session.  
-- Salle d’attente affichant les participants connectés.  
-- Écran de vote avec deck Planning Poker (1, 2, 3, 5, 8, 13, café, ?).  
-- Reveal des cartes, gestion des tours (revote, story suivante, fin de partie).  
-- Export JSON de l’état de la partie et des résultats finaux.  
-
----
-
-## Architecture du projet
-
-planningpoker-main/
-├─ app.py # Backend Flask + routes et logique métier
-├─ start.sh # Script de lancement de l’application
-├─ requirements.txt # Dépendances Python 
-├─ package.json # Config JS / tests front (Jest)
-├─ package-lock.json # Verrouillage des dépendances npm
-├─ README.md # Documentation du projet
-├─ asset/ # Cartes SVG 
-├─ templates/ # Pages HTML (Jinja)
-│ ├─ index.html # Page d'accueil
-│ ├─ create.html # Création d'une partie
-│ ├─ join.html # Rejoindre une partie
-│ ├─ waiting.html # Salle d'attente
-│ └─ vote.html # Écran de vote
-├─ static/ # JS / CSS côté client
-│ ├─ create.js
-│ ├─ waiting.js
-│ ├─ vote.js
-│ ├─ vote-utils.js
-│ └─ style.css 
-├─ tests/
-│ ├─ backend/ # Tests Pytest du backend Flask
-│ │ └─ test_app.py 
-│ └─ frontend/ # Tests Jest du frontend
-│ ├─ create.test.js
-│ ├─ waiting.test.js
-│ ├─ vote-dom.test.js
-│ └─ vote-utils.test.js
-└─ .git/ # Métadonnées Git 
-
----
-
-## Prérequis
-
-- Python 3.x installé.  
-- Accès à un projet Firebase / Firestore configuré (fichier de credentials référencé dans `app.py`).  
-- Optionnel : Node.js pour lancer ou modifier les tests front (Jest) définis dans `package.json` et `package-lock.json`.
-
----
-
-## Installation
-
-1. Cloner le dépôt :
-
-git clone https://github.com/planningpokerteams/planningpoker.git
-cd planningpoker-main
-
----
-
-## Lancement du projet
-
-Pour démarrer l'application, utilise simplement le script `start.sh` à la racine du projet :
-./start.sh
-
-Ce script se charge de préparer l'environnement puis lance l'application Flask définie dans `app.py` en mode développement.
-
----
-
-## Tests
-
-### Tests backend (Python)
-
-Depuis la racine du projet, avec l’environnement virtuel activé :
-python -m pytest tests/backend/test_app.py
+## 1) Fonctionnalités principales
+- Créer une session : organisateur + backlog + mode de jeu + durée par story.
+- Rejoindre une session via code + pseudo.
+- Deck de vote : 1, 2, 3, 5, 8, 13, ?, ☕ (café/pause).
+- Votes masqués jusqu’au reveal par l’organisateur.
+- Modes de décision : strict (unanimité), moyenne, médiane, majorité absolue, majorité relative.
+- Revote (relancer un tour de vote) et historisation des votes.
+- Chronomètre par story et pause automatique si tout le monde choisit `☕`.
+- Export complet de l’état (participants, backlog, historique) pour reprise ; export des résultats finaux au format JSON.
+- Chat intégré pour discuter avant un revote.
+- Actions restreintes à l’organisateur : démarrer la partie, reveal, revote, passer à la story suivante, activer le chat, télécharger l’export JSON.
 
 
-Les tests vérifient notamment :
+## 2) Règles de jeu (comportement implémenté)
+- Strict (unanimité) : nécessite l’unanimité des votes numériques; 
+- Si un autre mode que l'unanimité a été choisit seul le premier tour sera à l'unanimité.
+- `?` et `☕` sont ignorés quand on vérifie les votes .
+- Si tout le monde choisit `☕`, la partie est mise en pause et l’organisateur peut exporter l’état pour reprise.
 
-- La création et la jonction de sessions.  
-- Le démarrage de partie, le reveal, le passage à la story suivante, la fin de partie, etc.  
-- Les exports JSON (`/download_results`, `/export_state`) et la reprise de partie via un fichier JSON (`/resume_from_file`).
+  
+## 3) Format JSON (exemples)
+- Backlog minimal au démarrage (import) :
+```json
+{
+  {
+  "schemaVersion": 1,
+  "sessionId": "VWKTG9",
+  "organizer": "ruru",
+  "status": "paused",
+  "gameMode": "strict",
+  "timePerStory": 5,
+  "userStories": [
+    "erzfzr"
+  ],
+  "currentStoryIndex": 0,
+  "round_number": 2,
+  "history": [],
+  "participants": [
+    {
+      "hasVoted": true,
+      "vote": "☕",
+      "name": "YOYO",
+      "avatarSeed": "astronaut"
+    },
+    {
+      "hasVoted": true,
+      "vote": "☕",
+      "name": "ruru",
+      "avatarSeed": "astronaut"
+    }
+  ]
+}
+}
+```
+- L’export d’état inclut : participants, backlog courant, historique des tours de vote (par story), mode de jeu, status (paused / running), et résultat courant. Ce fichier permet de reprendre exactement une partie.
 
-### Tests frontend (JavaScript)
 
-Si Node.js et npm sont installés :
+## 4) Prérequis :
+- Python 3.10+
+- (Pour tests front) Node.js + npm
+- Projet Firebase/Firestore et clé de compte de service (JSON) si vous utilisez la persistance Firestore.
 
+Solution 1 : 
+Lancer le  (`start.sh`) pour préparer l’environnement et lancer l’app en développement depuis GIT BASH.
+
+Solution 2 :
+Jouer en ligne à : https://planningpoker-q3jm.onrender.com/
+
+Solution 3:
+
+a) Installer et activer un environnement virtuel
+# macOS / Linux
+python -m venv venv
+source venv/bin/activate
+
+# Windows (PowerShell)
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+
+b) Installer les dépendances Python
+pip install -r requirements.txt
+
+c) Configuration Firebase
+- Méthode fichier (recommandée) :
+  - macOS / Linux :
+    export GOOGLE_APPLICATION_CREDENTIALS="/chemin/vers/service-account.json"
+  - Windows PowerShell :
+    $env:GOOGLE_APPLICATION_CREDENTIALS = "C:\chemin\vers\service-account.json"
+- Ou méthode contenu JSON (utile sur Render) :
+  - stocker tout le JSON dans la variable `GOOGLE_APPLICATION_CREDENTIALS_JSON`.
+
+d) Démarrage
+python app.py
+Ouvrir ensuite : http://localhost:5000
+
+
+## 5) Tests
+- Backend (pytest) :
+pytest -q
+
+- Frontend (Jest) :
 npm install
-npm test
+npm test -- --runInBand
 
 
-Cela lance les tests Jest définis dans `tests/frontend` pour le comportement du code JavaScript (DOM, utilitaires, etc.).
+## 6) Arborescence & fichiers importants
+- app.py — backend principal (Flask + logique de sessions / persistance).
+- static/ — assets front (JS/CSS/images).
+- templates/ — pages HTML (Jinja2).
+- start.sh — script d’aide pour dev.
+- requirements.txt — deps Python.
+- package.json + jest.config.cjs — tests front / configuration Node.
 
----
+## 7) Dépannage rapide
+- Erreur « Non autorisé » : vérifiez que vous êtes l’organisateur (même pseudo) et que les cookies sont activés.
 
-## Licence
 
-Projet réalisé à des fins pédagogiques.
