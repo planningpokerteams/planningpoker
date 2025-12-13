@@ -2,24 +2,17 @@ name: CI
 
 on:
   push:
-    branches: [ main, develop ]
   pull_request:
-    branches: [ main, develop ]
 
 jobs:
   tests:
     runs-on: ubuntu-latest
 
     steps:
-      # -------------------------------------------------
-      # Checkout
-      # -------------------------------------------------
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # -------------------------------------------------
-      # Python backend
-      # -------------------------------------------------
+      # ---------- Backend : Python + Firestore ----------
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -30,30 +23,34 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # Firebase credentials (Render-style secret JSON)
-      - name: Recreate Firebase service account file
+      - name: Recreate Firebase service account file (base64)
         env:
-          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+          FIREBASE_SERVICE_ACCOUNT_B64: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_B64 }}
         run: |
-          echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > service-account.json
-          echo "GOOGLE_APPLICATION_CREDENTIALS=$(pwd)/service-account.json" >> $GITHUB_ENV
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT_B64" ]; then
+            echo "Missing secret FIREBASE_SERVICE_ACCOUNT_B64"
+            exit 1
+          fi
+
+          echo "$FIREBASE_SERVICE_ACCOUNT_B64" | base64 -d > service-account.json
+
+          python -c "import json; json.load(open('service-account.json')); print('Firebase JSON OK')"
+
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$PWD/service-account.json" >> $GITHUB_ENV
 
       - name: Run backend tests (pytest)
         env:
           PYTHONPATH: ${{ github.workspace }}
-        run: |
-          pytest -q
+        run: pytest -q
 
-      # -------------------------------------------------
-      # Frontend (Jest)
-      # -------------------------------------------------
+      # ---------- Frontend : Node + Jest ----------
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: "20"
 
       - name: Install frontend dependencies
-        run: npm install
+        run: npm ci
 
       - name: Run frontend tests (Jest)
         run: npm test -- --runInBand
