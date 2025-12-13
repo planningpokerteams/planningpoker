@@ -4,7 +4,8 @@ PROJECT_NAME           = "Planning Poker"
 PROJECT_BRIEF          = "Application de poker planning en ligne"
 PROJECT_NUMBER         = "1.0"
 
-OUTPUT_DIRECTORY       = docs/doxygen
+# Sortie dans un dossier unique pour fusion Doxygen + JSDoc
+OUTPUT_DIRECTORY       = site/doxygen
 CREATE_SUBDIRS         = NO
 
 # Build-related options
@@ -12,11 +13,13 @@ EXTRACT_ALL            = YES
 EXTRACT_PRIVATE        = YES
 EXTRACT_STATIC         = YES
 EXTRACT_LOCAL_CLASSES  = YES
+QUIET                  = YES
 
-# Input files
+# Input files (adapte selon ton arborescence)
 INPUT                  = app.py \
                          tests/backend \
-                         static/scripts \
+                         static \
+                         scripts \
                          templates
 
 FILE_PATTERNS          = *.py \
@@ -25,5 +28,9 @@ FILE_PATTERNS          = *.py \
 
 RECURSIVE              = YES
 
-EXCLUDE_PATTERNS       = /node_modules/ \
-                         /_p…
+# Exclusions propres
+EXCLUDE_PATTERNS       = */node_modules/* \
+                         */.git/* \
+                         */.venv/* \
+                         */venv/* \
+                         */__pycache__/*
