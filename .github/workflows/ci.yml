@@ -2,47 +2,58 @@ name: CI
 
 on:
   push:
+    branches: [ main, develop ]
   pull_request:
+    branches: [ main, develop ]
 
 jobs:
   tests:
     runs-on: ubuntu-latest
 
     steps:
+      # -------------------------------------------------
+      # Checkout
+      # -------------------------------------------------
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # ---------- Backend : Python + Firestore ----------
+      # -------------------------------------------------
+      # Python backend
+      # -------------------------------------------------
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Recreate Firebase service account file
-        env:
-          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
-        run: |
-          # On recrée le fichier JSON à partir du secret GitHub
-          echo "$FIREBASE_SERVICE_ACCOUNT_JSON" > pokerplanning-749a9-firebase-adminsdk-fbsvc-10f7d5cc49.json
-          # On indique ce chemin à app.py via une variable d'environnement
-          echo "GOOGLE_APPLICATION_CREDENTIALS=$PWD/pokerplanning-749a9-firebase-adminsdk-fbsvc-10f7d5cc49.json" >> $GITHUB_ENV
-
       - name: Install Python dependencies
         run: |
-          pip install --upgrade pip
+          python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run backend tests (pytest)
-        run: pytest
+      # Firebase credentials (Render-style secret JSON)
+      - name: Recreate Firebase service account file
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+        run: |
+          echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > service-account.json
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$(pwd)/service-account.json" >> $GITHUB_ENV
 
-      # ---------- Frontend : Node + Jest ----------
+      - name: Run backend tests (pytest)
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          pytest -q
+
+      # -------------------------------------------------
+      # Frontend (Jest)
+      # -------------------------------------------------
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: "20"
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: npm install
 
       - name: Run frontend tests (Jest)
-        run: npm test
+        run: npm test -- --runInBand
