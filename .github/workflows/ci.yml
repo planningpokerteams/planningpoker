@@ -11,9 +11,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # -------------------------------------------------
-      # Checkout
-      # -------------------------------------------------
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -30,7 +27,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # Firebase credentials (safe: Base64)
       - name: Recreate Firebase service account file
         env:
           FIREBASE_SERVICE_ACCOUNT_B64: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_B64 }}
@@ -42,7 +38,6 @@ jobs:
 
           echo "$FIREBASE_SERVICE_ACCOUNT_B64" | base64 -d > service-account.json
           python -c "import json; json.load(open('service-account.json')); print('Firebase JSON OK')"
-
           echo "GOOGLE_APPLICATION_CREDENTIALS=$PWD/service-account.json" >> $GITHUB_ENV
 
       - name: Run backend tests (pytest)
@@ -58,8 +53,15 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Install frontend dependencies
-        run: npm ci --include=dev
+      - name: Install frontend dependencies (with devDependencies)
+        env:
+          NODE_ENV: development
+          NPM_CONFIG_PRODUCTION: "false"
+        run: |
+          npm ci --production=false
+          # debug: vérifier que jest est bien installé
+          npm ls jest
+          ls -la node_modules/.bin | grep jest
 
       - name: Run frontend tests (Jest)
         run: npm test
