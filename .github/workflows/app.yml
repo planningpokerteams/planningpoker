@@ -41,7 +41,7 @@ jobs:
 
       - name: Start server and check response
         env:
-          SECRET_KEY: ${{ secrets.SECRET_KEY }} # si tu as besoin
+          SECRET_KEY: ${{ secrets.SECRET_KEY }} 
         run: |
           # S'assurer que la variable utilise le chemin absolu
           export GOOGLE_APPLICATION_CREDENTIALS="$HOME/.secrets/firebase-key.json"
