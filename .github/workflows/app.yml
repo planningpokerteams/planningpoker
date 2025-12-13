@@ -18,24 +18,37 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Write Firebase service account file
-        env:
-          FIREBASE_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+      - name: Create secrets dir
         run: |
           mkdir -p $HOME/.secrets
-          printf '%s' "$FIREBASE_JSON" > $HOME/.secrets/firebase-key.json
+          chmod 700 $HOME/.secrets
+
+      - name: Decode Firebase service account (base64) to file
+        env:
+          FIREBASE_B64: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_B64 }}
+        run: |
+          # Décoder sans afficher le secret dans les logs
+          printf '%s' "$FIREBASE_B64" | base64 --decode > $HOME/.secrets/firebase-key.json
           chmod 600 $HOME/.secrets/firebase-key.json
+
+      - name: Export GOOGLE_APPLICATION_CREDENTIALS and SERVICE_ACCOUNT_FILE
+        run: |
+          # Export pour toutes les steps suivantes
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$HOME/.secrets/firebase-key.json" >> $GITHUB_ENV
+          echo "SERVICE_ACCOUNT_FILE=$HOME/.secrets/firebase-key.json" >> $GITHUB_ENV
 
       - name: Install Python dependencies
         run: pip install -r requirements.txt
 
       - name: Start server and check response
         env:
-          GOOGLE_APPLICATION_CREDENTIALS: $HOME/.secrets/firebase-key.json
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
         run: |
+          # Démarrer le serveur en arrière-plan
           nohup python app.py > server.log 2>&1 &
-          sleep 6
+          # Attendre que l'app ait le temps de démarrer (adapter si besoin)
+          sleep 15
+          # Vérifier qu'une route répond
           if curl --fail http://localhost:5000/ -s -o /dev/null; then
             echo "Server responding on http://localhost:5000/"
           else
