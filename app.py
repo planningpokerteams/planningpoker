@@ -2,76 +2,110 @@ from flask import (
     Flask, render_template, request, redirect,
     url_for, session, jsonify, send_from_directory, Response
 )
+
 import os
 import random
 import string
 import time
 import json
+from typing import Any, Dict, List, Optional, Tuple
 
 import firebase_admin
 from firebase_admin import credentials, firestore
 
 
-
-# ---------------------------------------------------------
-# Initialisation Flask
-# ---------------------------------------------------------
+# =========================================================
+# 1) Initialisation Flask
+# =========================================================
 app = Flask(__name__)
-# Clé secrète : utiliser SECRET_KEY en prod, sinon valeur de dev
-app.secret_key = os.environ.get("SECRET_KEY", "une_grosse_chaine_aleatoire_que_tu_genere")
 
-# ---------------------------------------------------------
-# Chemins locaux (projet, credentials Firebase, assets SVG)
-# ---------------------------------------------------------
+# IMPORTANT :
+# - En prod, mets SECRET_KEY dans les variables d'env.
+# - En dev, fallback acceptable.
+app.secret_key = os.environ.get(
+    "SECRET_KEY",
+    "dev_only_change_me_to_a_real_secret_key"
+)
+
+# Optionnel mais recommandé (sécurité cookies de session)
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+)
+
+
+# =========================================================
+# 2) Chemins locaux (projet, credentials Firebase, assets SVG)
+# =========================================================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ASSET_FOLDER = os.path.join(BASE_DIR, "asset")
 
-# On accepte soit un chemin fourni par l'env, soit le fichier local (dev)
 DEFAULT_SERVICE_ACCOUNT = os.path.join(
     BASE_DIR,
     "pokerplanning-749a9-firebase-adminsdk-fbsvc-10f7d5cc49.json"
 )
+
+# 3 modes possibles (dans l'ordre de priorité ci-dessous) :
+# 1) Render secret file : /etc/secrets/firebase-key.json
+# 2) Env var GOOGLE_APPLICATION_CREDENTIALS_JSON (json string OU chemin fichier)
+# 3) Env var GOOGLE_APPLICATION_CREDENTIALS (chemin fichier) sinon local dev
 SERVICE_ACCOUNT_FILE = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", DEFAULT_SERVICE_ACCOUNT)
 SERVICE_ACCOUNT_JSON = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
-
-# Support Render Secret Files: /etc/secrets/firebase-key.json
 RENDER_SECRET_FILE = "/etc/secrets/firebase-key.json"
 
-if not firebase_admin._apps:
-    cred = None
-    # 1) Secret file if present (Render)
+
+# =========================================================
+# 3) Initialisation Firebase Admin + Firestore
+# =========================================================
+def _init_firebase() -> None:
+    """
+    Initialise Firebase Admin une seule fois.
+    Supporte Render secret files + env json + fichier local.
+    """
+    if firebase_admin._apps:
+        return
+
+    cred_obj = None
+
+    # (1) Render secret file
     if os.path.exists(RENDER_SECRET_FILE):
         try:
             with open(RENDER_SECRET_FILE, "r", encoding="utf-8") as f:
                 cred_data = json.load(f)
-            cred = credentials.Certificate(cred_data)
+            cred_obj = credentials.Certificate(cred_data)
         except Exception:
-            cred = None
-    # 2) Env var JSON or path
-    if cred is None and SERVICE_ACCOUNT_JSON:
+            cred_obj = None
+
+    # (2) Env JSON (json string ou chemin)
+    if cred_obj is None and SERVICE_ACCOUNT_JSON:
         try:
             cred_data = json.loads(SERVICE_ACCOUNT_JSON)
-            cred = credentials.Certificate(cred_data)
+            cred_obj = credentials.Certificate(cred_data)
         except Exception:
-            # If it's actually a file path
+            # Si ce n'est pas du JSON, on tente comme un path
             if os.path.exists(SERVICE_ACCOUNT_JSON):
-                cred = credentials.Certificate(SERVICE_ACCOUNT_JSON)
-    # 3) Local dev file
-    if cred is None:
-        cred = credentials.Certificate(SERVICE_ACCOUNT_FILE)
+                cred_obj = credentials.Certificate(SERVICE_ACCOUNT_JSON)
 
-    firebase_admin.initialize_app(cred)
+    # (3) Local / path
+    if cred_obj is None:
+        cred_obj = credentials.Certificate(SERVICE_ACCOUNT_FILE)
+
+    firebase_admin.initialize_app(cred_obj)
+
+
+_init_firebase()
 db = firestore.client()
 
-# ---------------------------------------------------------
-# Données statiques pour les avatars et le deck de cartes
-# ---------------------------------------------------------
+
+# =========================================================
+# 4) Données statiques : avatars + cartes
+# =========================================================
 AVATAR_SEEDS = [
     "astronaut", "ninja", "pirate", "wizard",
     "gamer", "robot", "detective", "viking"
 ]
 
-# Deck utilisé pour le poker planning (inclut café et ?)
+# Deck planning poker (inclut café et ?)
 CARDS = [
     {"value": 1, "file": "cartes_1.svg"},
     {"value": 2, "file": "cartes_2.svg"},
@@ -83,57 +117,131 @@ CARDS = [
     {"value": "?", "file": "cartes_interro.svg"},
 ]
 
-# ---------------------------------------------------------
-# Utilitaire : génération d’un code de session aléatoire
-# ---------------------------------------------------------
-def generate_session_id():
+
+# =========================================================
+# 5) Helpers / utilitaires
+# =========================================================
+def generate_session_id() -> str:
+    """Génère un code de session (6 chars) : A-Z0-9."""
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
 
-# ---------------------------------------------------------
-# Route de service : servir les fichiers d’assets (cartes SVG)
-# ---------------------------------------------------------
+
+def _session_ref(session_id: str):
+    """Raccourci Firestore : doc ref d'une session."""
+    return db.collection("sessions").document(session_id)
+
+
+def _get_session_or_404(session_id: str) -> Tuple[Any, Dict[str, Any]]:
+    """
+    Récupère session snapshot + dict.
+    Lève une réponse 404 (via tuple) si introuvable.
+    """
+    ref = _session_ref(session_id)
+    snap = ref.get()
+    if not snap.exists:
+        # on renvoie une "pseudo réponse" gérée par l'appelant
+        return ref, {}
+    return ref, (snap.to_dict() or {})
+
+
+def _require_user() -> Optional[str]:
+    """Retourne le username en session Flask, ou None."""
+    return session.get("username")
+
+
+def _safe_int(value: Any, default: int, min_value: Optional[int] = None) -> int:
+    """Convertit en int (fallback default) + clamp min si fourni."""
+    try:
+        v = int(value)
+    except Exception:
+        v = default
+    if min_value is not None and v < min_value:
+        v = min_value
+    return v
+
+
+def _participants_list(session_ref) -> List[Dict[str, Any]]:
+    """Liste brute des participants."""
+    return [p.to_dict() for p in session_ref.collection("participants").stream()]
+
+
+def _update_participant_by_name(session_ref, name: str, patch: Dict[str, Any]) -> bool:
+    """
+    Met à jour le 1er participant trouvé avec `name`.
+    (Optimisation : au lieu de parcourir tous les docs.)
+    Retourne True si update, False sinon.
+    """
+    q = session_ref.collection("participants").where("name", "==", name).limit(1).stream()
+    doc = next(q, None)
+    if not doc:
+        return False
+    doc.reference.update(patch)
+    return True
+
+
+def _reset_all_votes(session_ref) -> None:
+    """
+    Reset vote/hasVoted pour tous les participants.
+    (Pour gros volumes : on pourra passer en batch, mais ici ça suffit.)
+    """
+    for p in session_ref.collection("participants").stream():
+        p.reference.update({"vote": None, "hasVoted": False})
+
+
+# =========================================================
+# 6) Assets : servir les fichiers (cartes SVG)
+# =========================================================
 @app.route("/asset/<path:filename>")
 def asset_file(filename):
     return send_from_directory(ASSET_FOLDER, filename)
 
 
-# ---------------------------------------------------------
-# Page d’accueil (landing / choix créer ou rejoindre)
-# ---------------------------------------------------------
-@app.route('/')
+# =========================================================
+# 7) Pages
+# =========================================================
+@app.route("/")
 def index():
-    return render_template('index.html')
+    return render_template("index.html")
 
-# ---------------------------------------------------------
-# CREATE SESSION : création d’une nouvelle partie
-# ---------------------------------------------------------
-@app.route('/create', methods=['GET', 'POST'])
+
+# =========================================================
+# 8) CREATE : création d’une nouvelle partie
+# =========================================================
+@app.route("/create", methods=["GET", "POST"])
 def create():
-    if request.method == 'POST':
-        organizer = request.form['organizer']
-        user_stories = request.form.getlist('userStories')
-        avatar_seed = request.form.get('avatar_seed', AVATAR_SEEDS[0])
-        game_mode = request.form.get('game_mode', 'strict')
-        time_per_story = int(request.form.get('timePerStory', 5))
+    if request.method == "POST":
+        organizer = (request.form.get("organizer") or "").strip()
+        user_stories = request.form.getlist("userStories")
+        avatar_seed = request.form.get("avatar_seed", AVATAR_SEEDS[0])
+        game_mode = request.form.get("game_mode", "strict")
+        time_per_story = _safe_int(request.form.get("timePerStory", 5), default=5, min_value=1)
 
-        # Nouveau : fichier JSON optionnel pour reprendre une partie
-        resume_file = request.files.get('resume_file')
+        if not organizer:
+            return "Pseudo organisateur requis.", 400
+
+        # Import JSON optionnel (reprendre une partie)
+        resume_file = request.files.get("resume_file")
         imported_state = None
         if resume_file and resume_file.filename:
             try:
                 imported_state = json.load(resume_file.stream)
             except Exception:
-                imported_state = None  # en vrai, tu pourrais afficher un message d'erreur
+                imported_state = None  # tu peux remplacer par un flash message si tu veux
 
+        # Générer un code unique (simple retry si collision)
         session_id = generate_session_id()
-        session_ref = db.collection('sessions').document(session_id)
+        session_ref = _session_ref(session_id)
+        while session_ref.get().exists:
+            session_id = generate_session_id()
+            session_ref = _session_ref(session_id)
 
+        # ---------- Création session Firestore ----------
         if imported_state:
-            # On utilise ce qui vient du JSON pour préremplir la session
-            data = imported_state
+            data = imported_state or {}
+
             session_ref.set({
-                "organizer": organizer,  # le nouvel organisateur
-                "status": "waiting",     # on repart toujours en attente
+                "organizer": organizer,  # nouvel organisateur
+                "status": "waiting",
                 "userStories": data.get("userStories", user_stories) or user_stories,
                 "currentStoryIndex": data.get("currentStoryIndex", 0),
                 "reveal": False,
@@ -145,7 +253,7 @@ def create():
                 "timerStart": None,
             })
 
-            # Recréer les participants de l'ancienne partie
+            # Recréer les participants de l'ancienne partie (optionnel)
             for p in data.get("participants", []):
                 session_ref.collection("participants").add({
                     "name": p.get("name"),
@@ -154,7 +262,6 @@ def create():
                     "hasVoted": p.get("hasVoted", False),
                 })
         else:
-            # Comportement actuel (création d'une nouvelle partie vierge)
             session_ref.set({
                 "organizer": organizer,
                 "status": "waiting",
@@ -169,7 +276,7 @@ def create():
                 "timerStart": None,
             })
 
-        # Dans tous les cas, ajouter l'organisateur comme participant
+        # Ajouter l'organisateur comme participant (même si import)
         session_ref.collection("participants").add({
             "name": organizer,
             "vote": None,
@@ -177,30 +284,34 @@ def create():
             "hasVoted": False
         })
 
+        # Sauvegarde côté session Flask
         session["username"] = organizer
         session["session_id"] = session_id
         session["avatarSeed"] = avatar_seed
 
-        return redirect(url_for('waiting', session_id=session_id))
+        return redirect(url_for("waiting", session_id=session_id))
 
     return render_template("create.html", avatars=AVATAR_SEEDS)
 
-# ---------------------------------------------------------
-# JOIN : rejoindre une session existante avec un code
-# ---------------------------------------------------------
-@app.route('/join', methods=['GET', 'POST'])
-def join():
-    if request.method == 'POST':
-        code = request.form['code']
-        name = request.form['name']
-        avatar_seed = request.form.get('avatar_seed', AVATAR_SEEDS[0])
 
-        # Vérifie que la session existe
-        session_ref = db.collection("sessions").document(code)
-        if not session_ref.get().exists:
+# =========================================================
+# 9) JOIN : rejoindre une session existante
+# =========================================================
+@app.route("/join", methods=["GET", "POST"])
+def join():
+    if request.method == "POST":
+        code = (request.form.get("code") or "").strip().upper()
+        name = (request.form.get("name") or "").strip()
+        avatar_seed = request.form.get("avatar_seed", AVATAR_SEEDS[0])
+
+        if not code or not name:
+            return "Code et pseudo requis.", 400
+
+        session_ref, data = _get_session_or_404(code)
+        if not data:
             return "Code invalide."
 
-        # Ajoute le participant à la collection participants
+        # Ajoute le participant (on garde ton comportement : pas de blocage doublon)
         session_ref.collection("participants").add({
             "name": name,
             "vote": None,
@@ -208,78 +319,66 @@ def join():
             "hasVoted": False
         })
 
-        # Sauvegarde de l’identité dans la session Flask
+        # Session Flask
         session["username"] = name
         session["session_id"] = code
         session["avatarSeed"] = avatar_seed
 
-        # Redirection vers la salle d’attente
         return redirect(url_for("waiting", session_id=code))
 
-    # GET : formulaire pour rejoindre une session
     return render_template("join.html", avatars=AVATAR_SEEDS)
 
-# ---------------------------------------------------------
-# SALLE D’ATTENTE : affichage des joueurs connectés
-# ---------------------------------------------------------
-@app.route('/waiting/<session_id>')
+
+# =========================================================
+# 10) WAITING ROOM : liste des joueurs
+# =========================================================
+@app.route("/waiting/<session_id>")
 def waiting(session_id):
-    session_ref = db.collection('sessions').document(session_id)
-    snapshot = session_ref.get()
-    if not snapshot.exists:
+    session_ref, session_data = _get_session_or_404(session_id)
+    if not session_data:
         return "Session introuvable", 404
 
-    session_data = snapshot.to_dict()
-    participants = [p.to_dict()
-                    for p in session_ref.collection('participants').stream()]
+    participants = _participants_list(session_ref)
 
     return render_template(
         "waiting.html",
         session_id=session_id,
         session=session_data,
         participants=participants,
-        current_user=session.get("username")
+        current_user=session.get("username"),
     )
 
-# API utilisée par la waiting room pour rafraîchir la liste des joueurs
-@app.route('/api/participants/<session_id>')
+
+@app.route("/api/participants/<session_id>")
 def api_participants(session_id):
-    session_ref = db.collection("sessions").document(session_id)
-    snapshot = session_ref.get()
-    if not snapshot.exists:
+    session_ref, session_data = _get_session_or_404(session_id)
+    if not session_data:
         return jsonify({"error": "session_not_found"}), 404
 
-    session_data = snapshot.to_dict()
-    participants = [p.to_dict()
-                    for p in session_ref.collection("participants").stream()]
-
+    participants = _participants_list(session_ref)
     return jsonify({
         "participants": participants,
         "status": session_data.get("status", "waiting")
     })
 
-# ---------------------------------------------------------
-# START GAME : l’organisateur lance la partie
-# ---------------------------------------------------------
-@app.route('/start/<session_id>', methods=['POST'])
+
+# =========================================================
+# 11) START GAME : seul l’organisateur peut démarrer
+# =========================================================
+@app.route("/start/<session_id>", methods=["POST"])
 def start(session_id):
-    session_ref = db.collection("sessions").document(session_id)
-    snapshot = session_ref.get()
-    if not snapshot.exists:
+    session_ref, session_data = _get_session_or_404(session_id)
+    if not session_data:
         return "Session introuvable", 404
 
-    username = session.get("username")
-    session_data = snapshot.to_dict()
-
-    # Sécurité : seul l’organisateur peut démarrer
+    username = _require_user()
     if username != session_data.get("organizer"):
         return "Non autorisé"
 
     # Reset des votes avant de commencer
-    for p in session_ref.collection("participants").stream():
-        p.reference.update({"vote": None, "hasVoted": False})
+    _reset_all_votes(session_ref)
 
-    # IMPORTANT : on ne change plus currentStoryIndex ici
+    # IMPORTANT : on ne touche pas à currentStoryIndex ici
     session_ref.update({
         "status": "started",
         "reveal": False,
@@ -290,40 +389,46 @@ def start(session_id):
     return redirect(url_for("vote", session_id=session_id))
 
 
-# ---------------------------------------------------------
-# VOTE PAGE : écran principal de vote (tous les joueurs)
-# ---------------------------------------------------------
-@app.route('/vote/<session_id>', methods=['GET', 'POST'])
+# =========================================================
+# 12) VOTE : page principale
+# =========================================================
+@app.route("/vote/<session_id>", methods=["GET", "POST"])
 def vote(session_id):
-    session_ref = db.collection("sessions").document(session_id)
-    snapshot = session_ref.get()
-    if not snapshot.exists:
+    session_ref, data = _get_session_or_404(session_id)
+    if not data:
         return "Session introuvable", 404
 
-    data = snapshot.to_dict()
-
-    # Si on n’a pas d’utilisateur en session, on renvoie vers /join
     if "username" not in session:
         return redirect(url_for("join"))
 
     username = session["username"]
 
-    # Lorsqu’un joueur envoie un vote
+    # POST : enregistre vote du joueur
     if request.method == "POST":
-        vote_val = request.form["vote"]
-        for p in session_ref.collection("participants").stream():
-            if p.to_dict().get("name") == username:
-                p.reference.update({
-                    "vote": vote_val,
-                    "hasVoted": True
-                })
-                break
+        vote_val = request.form.get("vote")
+
+        # Optimisation : query au lieu de parcourir tous les participants
+        updated = _update_participant_by_name(session_ref, username, {
+            "vote": vote_val,
+            "hasVoted": True
+        })
+
+        # Si le user n'est pas trouvé (edge case), on ne casse pas la page
+        if not updated:
+            # on peut choisir de l'ajouter (mais ça peut créer des doublons)
+            session_ref.collection("participants").add({
+                "name": username,
+                "vote": vote_val,
+                "avatarSeed": session.get("avatarSeed", AVATAR_SEEDS[0]),
+                "hasVoted": True
+            })
+
         return redirect(url_for("vote", session_id=session_id))
 
-    # GET : affichage de la table de vote
-    # Construire la liste des participants en masquant les votes des autres
-    participants_full = [p.to_dict() for p in session_ref.collection('participants').stream()]
+    # GET : construire participants (votes masqués selon règles)
+    participants_full = _participants_list(session_ref)
     is_organizer = (username == data.get("organizer"))
+
     participants = []
     for p in participants_full:
         sanitized = {
@@ -331,12 +436,13 @@ def vote(session_id):
             "avatarSeed": p.get("avatarSeed"),
             "hasVoted": p.get("hasVoted", False),
         }
-        # On n'expose la valeur du vote que si les cartes sont révélées,
-        # ou si l'utilisateur courant est l'organisateur, ou si c'est le joueur lui-même
+
+        # Votes visibles si reveal OU orga OU soi-même
         if data.get("reveal", False) or is_organizer or p.get("name") == username:
             sanitized["vote"] = p.get("vote")
         else:
             sanitized["vote"] = None
+
         participants.append(sanitized)
 
     return render_template(
@@ -349,70 +455,59 @@ def vote(session_id):
         cards=CARDS
     )
 
-# ---------------------------------------------------------
-# REVEAL : l’organisateur révèle les cartes
-# ---------------------------------------------------------
-@app.route('/reveal/<session_id>', methods=['POST'])
+
+# =========================================================
+# 13) REVEAL : l’organisateur révèle les cartes
+# =========================================================
+@app.route("/reveal/<session_id>", methods=["POST"])
 def reveal(session_id):
-    session_ref = db.collection("sessions").document(session_id)
-    snapshot = session_ref.get()
-    if not snapshot.exists:
+    session_ref, data = _get_session_or_404(session_id)
+    if not data:
         return "Session introuvable", 404
 
-    data = snapshot.to_dict()
-    username = session.get("username")
+    username = _require_user()
     if username != data.get("organizer"):
         return "Non autorisé"
 
     if data.get("status") == "finished":
         return "Partie terminée", 400
 
-    # Flag Firestore permettant au front d’afficher les cartes
     session_ref.update({"reveal": True})
     return redirect(url_for("vote", session_id=session_id))
 
-# ---------------------------------------------------------
-# API GAME STATE : état temps réel de la partie
-# ---------------------------------------------------------
-@app.route('/api/game/<session_id>')
+
+# =========================================================
+# 14) API GAME STATE : état temps réel
+# =========================================================
+@app.route("/api/game/<session_id>")
 def api_game(session_id):
-    session_ref = db.collection("sessions").document(session_id)
-    snapshot = session_ref.get()
-    if not snapshot.exists:
+    session_ref, data = _get_session_or_404(session_id)
+    if not data:
         return jsonify({"error": "not_found"}), 404
 
-    data = snapshot.to_dict() or {}
     stories = data.get("userStories", [])
     idx = data.get("currentStoryIndex", 0)
     current_story = stories[idx] if 0 <= idx < len(stories) else ""
 
-    participants_snap = list(session_ref.collection("participants").stream())
-    participants_full = [p.to_dict() for p in participants_snap]
+    participants_full = _participants_list(session_ref)
 
-    # Contexte de l'appel (qui demande l'état)
     current_user = session.get("username")
     is_current_organizer = (current_user == data.get("organizer"))
 
-    # Votes bruts
     votes_raw = [p.get("vote") for p in participants_full]
 
-    # all_cafe : vrai seulement si TOUT le monde a mis ☕
     all_cafe = bool(participants_full) and all(v == "☕" for v in votes_raw)
-
-    # all_voted : vrai si personne n'a laissé la valeur à None.
-    # Ici on considère que '?' et '☕' sont des actions (donc comptent comme "a voté").
     all_voted = all(v is not None for v in votes_raw)
 
-    # Unanimité : on ignore '?' et '☕' pour décider si les votes restants sont identiques.
+    # Unanimité : on ignore '?' et '☕'
     non_ignored_votes = [v for v in votes_raw if v is not None and v not in ("?", "☕")]
     unanimous = False
     unanimous_value = None
-    if non_ignored_votes:
-        if all(x == non_ignored_votes[0] for x in non_ignored_votes):
-            unanimous = True
-            unanimous_value = non_ignored_votes[0]
+    if non_ignored_votes and all(x == non_ignored_votes[0] for x in non_ignored_votes):
+        unanimous = True
+        unanimous_value = non_ignored_votes[0]
 
-    # Construire la liste renvoyée au front en MASQUANT les votes des autres
+    # Participants renvoyés au front (votes masqués)
     participants = []
     for p in participants_full:
         sanitized = {
@@ -420,40 +515,34 @@ def api_game(session_id):
             "avatarSeed": p.get("avatarSeed", AVATAR_SEEDS[0]),
             "hasVoted": p.get("hasVoted", False),
         }
-        # On n'expose la valeur du vote que si :
-        # - les cartes sont révélées, ou
-        # - l'appelant est l'organisateur, ou
-        # - l'appelant est le joueur lui-même
         if data.get("reveal", False) or is_current_organizer or p.get("name") == current_user:
             sanitized["vote"] = p.get("vote")
         else:
             sanitized["vote"] = None
         participants.append(sanitized)
 
-    # Gestion de la pause café : si tout le monde est sur ☕
+    # Pause café : si tout le monde met ☕, on passe en paused (une seule fois)
     if all_cafe and data.get("status") not in ("finished", "paused"):
         time_per_story = data.get("timePerStory", 5)
-        timer_start    = data.get("timerStart")
+        timer_start = data.get("timerStart")
         pause_remaining = None
 
-        # Calcul du temps restant au moment de la pause
         if timer_start is not None:
-            now     = int(time.time())
+            now = int(time.time())
             elapsed = now - int(timer_start)
-            total   = time_per_story * 60
+            total = int(time_per_story) * 60
             pause_remaining = max(0, total - elapsed)
 
-        # On arrête le chrono et on mémorise les secondes restantes
         session_ref.update({
             "status": "paused",
             "timerStart": None,
             "pauseRemaining": pause_remaining
         })
-        data["status"]         = "paused"
-        data["timerStart"]     = None
+
+        data["status"] = "paused"
+        data["timerStart"] = None
         data["pauseRemaining"] = pause_remaining
 
-    # Structure renvoyée au front (vote.js) pour l’UI temps réel
     return jsonify({
         "participants": participants,
         "allVoted": all_voted,
@@ -467,43 +556,36 @@ def api_game(session_id):
         "roundNumber": data.get("round_number", 1),
         "timePerStory": data.get("timePerStory", 5),
         "timerStart": data.get("timerStart"),
-        "status": data.get("status", "waiting")
-        # "pauseRemaining": data.get("pauseRemaining")  # exposable si besoin
+        "status": data.get("status", "waiting"),
+        # "pauseRemaining": data.get("pauseRemaining")
     })
 
-# ---------------------------------------------------------
-# RESUME : reprise après une pause café
-# ---------------------------------------------------------
-@app.route('/resume/<session_id>', methods=['POST'])
+
+# =========================================================
+# 15) RESUME : reprise après pause café
+# =========================================================
+@app.route("/resume/<session_id>", methods=["POST"])
 def resume(session_id):
-    """Reprendre une partie en pause café en gardant le temps restant."""
-    session_ref = db.collection("sessions").document(session_id)
-    snapshot = session_ref.get()
-    if not snapshot.exists:
+    session_ref, data = _get_session_or_404(session_id)
+    if not data:
         return jsonify({"error": "not_found"}), 404
 
-    data = snapshot.to_dict() or {}
     if data.get("status") != "paused":
         return jsonify({"status": "ignored"}), 200
 
-    time_per_story  = data.get("timePerStory", 5)
-    pause_remaining = data.get("pauseRemaining")  # secondes restantes
+    time_per_story = data.get("timePerStory", 5)
+    pause_remaining = data.get("pauseRemaining")
     now = int(time.time())
 
-    # Si aucun temps restant stocké, on repart sur un timer complet
     if pause_remaining is None or pause_remaining <= 0:
         new_timer_start = now
     else:
-        total_seconds   = time_per_story * 60
-        # On choisit new_timer_start pour que :
-        # remaining = total_seconds - (now - new_timer_start) = pause_remaining
+        total_seconds = int(time_per_story) * 60
         new_timer_start = now - (total_seconds - int(pause_remaining))
 
-    # Nettoyage des votes ☕ pour relancer un nouveau tour sur la même story
-    for p in session_ref.collection("participants").stream():
-        p.reference.update({"vote": None, "hasVoted": False})
+    # Nettoyage votes pour relancer un tour
+    _reset_all_votes(session_ref)
 
-    # Reprise de la partie avec le chrono recalibré
     session_ref.update({
         "status": "started",
         "timerStart": new_timer_start,
@@ -511,17 +593,16 @@ def resume(session_id):
     })
     return jsonify({"status": "ok"})
 
-# ---------------------------------------------------------
-# NEXT STORY : passage à la user story suivante
-# ---------------------------------------------------------
-@app.route('/next_story/<session_id>', methods=['POST'])
+
+# =========================================================
+# 16) NEXT STORY : story suivante / fin de partie
+# =========================================================
+@app.route("/next_story/<session_id>", methods=["POST"])
 def next_story(session_id):
-    session_ref = db.collection("sessions").document(session_id)
-    snapshot = session_ref.get()
-    if not snapshot.exists:
+    session_ref, data = _get_session_or_404(session_id)
+    if not data:
         return jsonify({"error": "not_found"}), 404
 
-    data = snapshot.to_dict() or {}
     if data.get("status") == "finished":
         return jsonify({"error": "game_finished"}), 400
 
@@ -529,11 +610,10 @@ def next_story(session_id):
     idx = data.get("currentStoryIndex", 0)
     history = data.get("history", [])
 
-    # Résultat global envoyé par le front (mode strict / moyenne / etc.)
     req_data = request.get_json(silent=True) or {}
     result = req_data.get("result")
 
-    # Construction de l’historique détaillé avec tous les votes
+    # votes détaillés (pour historique)
     all_votes = []
     for p in session_ref.collection("participants").stream():
         user = p.to_dict()
@@ -551,61 +631,36 @@ def next_story(session_id):
         "votes": all_votes
     })
 
-    # Si le front n'a pas envoyé de 'result', on peut le calculer ici en
-    # ignorant les votes '?' et les cafés '☕' (sauf si tout le monde a mis ☕).
+    # Si pas de result envoyé par le front, on calcule une moyenne simple
     if result is None:
-        # Récupérer les votes bruts pour décider
         votes_raw = [v.get("vote") for v in all_votes]
-
-        # Détecter si tout le monde a mis café
         all_cafe = bool(votes_raw) and all(v == "☕" for v in votes_raw)
 
-        # Construire la liste de valeurs numériques à agréger en ignorant
-        # '?' et '☕' (si ce n'est pas le cas où tout le monde a mis ☕)
-        numeric_votes = []
+        numeric_votes: List[float] = []
         for v in votes_raw:
-            if v is None:
+            if v is None or v == "?" or (v == "☕" and not all_cafe):
                 continue
-            if v == "?":
-                # Ignoré dans l'agrégation (considéré comme "nul", 0 influence)
-                continue
-            if v == "☕":
-                # Si tout le monde a mis café, on ne peut pas calculer de valeur
-                # numérique utile -> on laisse result comme None
-                if all_cafe:
-                    numeric_votes = []
-                    break
-                else:
-                    # Ignorer les cafés individuels si pas unanimité
-                    continue
-            # Tenter de convertir en nombre
+            if v == "☕" and all_cafe:
+                numeric_votes = []
+                break
             try:
-                num = float(v)
-                numeric_votes.append(num)
+                numeric_votes.append(float(v))
             except Exception:
                 continue
 
-        # Calculer une moyenne si on a des votes numériques
         if numeric_votes:
             avg = sum(numeric_votes) / len(numeric_votes)
-            # Arrondir à l'entier le plus proche pour rester consistant avec les cartes
             result = int(round(avg))
         else:
-            # Pas de vote numérique significatif -> on garde None
             result = None
 
-        # Mettre à jour l'historique dernier élément avec le résultat calculé
         history[-1]["result"] = result
 
-    update_payload = {
-        "history": history
-    }
+    update_payload: Dict[str, Any] = {"history": history}
 
-    # Reset des votes pour la prochaine story (ou fin de partie)
-    for p in session_ref.collection('participants').stream():
-        p.reference.update({"vote": None, "hasVoted": False})
+    # Reset votes pour le prochain tour/story
+    _reset_all_votes(session_ref)
 
-    # Cas 1 : il reste des stories -> on avance l’index
     if idx < len(stories) - 1:
         idx += 1
         update_payload.update({
@@ -617,7 +672,6 @@ def next_story(session_id):
             "status": "started"
         })
     else:
-        # Cas 2 : dernière story -> on termine la partie
         update_payload.update({
             "status": "finished",
             "reveal": True,
@@ -628,92 +682,80 @@ def next_story(session_id):
     session_ref.update(update_payload)
     return jsonify({"status": "ok"})
 
-# ---------------------------------------------------------
-# REVOTE : même story, nouveau tour d’estimation
-# ---------------------------------------------------------
-@app.route('/revote/<session_id>', methods=['POST'])
+
+# =========================================================
+# 17) REVOTE : même story, nouveau tour
+# =========================================================
+@app.route("/revote/<session_id>", methods=["POST"])
 def revote(session_id):
-    session_ref = db.collection("sessions").document(session_id)
-    snapshot = session_ref.get()
-    if not snapshot.exists:
+    session_ref, data = _get_session_or_404(session_id)
+    if not data:
         return jsonify({"error": "not_found"}), 404
 
-    data = snapshot.to_dict() or {}
     if data.get("status") == "finished":
         return jsonify({"error": "game_finished"}), 400
 
     current_round = data.get("round_number", 1)
 
-    # Reset des votes, mais on ne touche pas au timer pour garder
-    # la même contrainte de temps sur les tours suivants
-    for p in session_ref.collection("participants").stream():
-        p.reference.update({"vote": None, "hasVoted": False})
+    _reset_all_votes(session_ref)
 
     session_ref.update({
         "reveal": False,
         "final_result": None,
-        "round_number": current_round + 1
+        "round_number": int(current_round) + 1
     })
 
     return jsonify({"status": "ok"})
 
 
-# ---------------------------------------------------------
-# CHAT API : stocke et lit les messages de chat pour une session
-# ---------------------------------------------------------
-@app.route('/api/chat/<session_id>', methods=['GET', 'POST'])
+# =========================================================
+# 18) CHAT API : GET/POST messages
+# =========================================================
+@app.route("/api/chat/<session_id>", methods=["GET", "POST"])
 def api_chat(session_id):
-    session_ref = db.collection('sessions').document(session_id)
-    snapshot = session_ref.get()
-    if not snapshot.exists:
+    session_ref, data = _get_session_or_404(session_id)
+    if not data:
         return jsonify({"error": "not_found"}), 404
 
-    # POST -> ajouter un message
-    if request.method == 'POST':
-        username = session.get('username')
+    if request.method == "POST":
+        username = session.get("username")
         if not username:
             return jsonify({"error": "not_authenticated"}), 401
 
-        data = request.get_json(silent=True) or {}
-        text = data.get('text', '').strip()
+        body = request.get_json(silent=True) or {}
+        text = (body.get("text") or "").strip()
         if not text:
             return jsonify({"error": "empty"}), 400
 
-        chat_ref = session_ref.collection('chat')
-        chat_ref.add({
-            'sender': username,
-            'text': text,
-            'ts': int(time.time())
+        session_ref.collection("chat").add({
+            "sender": username,
+            "text": text,
+            "ts": int(time.time())
         })
         return jsonify({"status": "ok"}), 201
 
-    # GET -> renvoyer les derniers messages (limit 200)
     msgs = []
-    for doc in session_ref.collection('chat').order_by('ts').limit(200).stream():
+    for doc in session_ref.collection("chat").order_by("ts").limit(200).stream():
         d = doc.to_dict()
         msgs.append({
-            'sender': d.get('sender'),
-            'text': d.get('text'),
-            'ts': d.get('ts')
+            "sender": d.get("sender"),
+            "text": d.get("text"),
+            "ts": d.get("ts")
         })
 
     return jsonify({"messages": msgs})
 
-# ---------------------------------------------------------
-# DOWNLOAD RESULTS : export JSON complet de la session
-# ---------------------------------------------------------
-@app.route('/export_state/<session_id>')
+
+# =========================================================
+# 19) EXPORTS : état complet + résultats simples
+# =========================================================
+@app.route("/export_state/<session_id>")
 def export_state(session_id):
-    session_ref = db.collection("sessions").document(session_id)
-    snapshot = session_ref.get()
-    if not snapshot.exists:
+    session_ref, data = _get_session_or_404(session_id)
+    if not data:
         return "Session introuvable", 404
 
-    data = snapshot.to_dict() or {}
-
-    # Récupérer les participants actuels
-    participants_snap = list(session_ref.collection("participants").stream())
-    participants = [p.to_dict() for p in participants_snap]
+    participants = _participants_list(session_ref)
 
     export = {
         "schemaVersion": 1,
@@ -735,20 +777,15 @@ def export_state(session_id):
     return Response(
         json_str,
         mimetype="application/json",
-        headers={
-            "Content-Disposition": f"attachment; filename={filename}"
-        },
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
 
-@app.route('/download_results/<session_id>')
-def download_results(session_id):
-    """Exporter les résultats finaux de la session (format plus simple)."""
-    session_ref = db.collection("sessions").document(session_id)
-    snapshot = session_ref.get()
-    if not snapshot.exists:
-        return "Session introuvable", 404
 
-    data = snapshot.to_dict() or {}
+@app.route("/download_results/<session_id>")
+def download_results(session_id):
+    session_ref, data = _get_session_or_404(session_id)
+    if not data:
+        return "Session introuvable", 404
 
     export = {
         "sessionId": session_id,
@@ -766,16 +803,25 @@ def download_results(session_id):
     return Response(
         json_str,
         mimetype="application/json",
-        headers={
-            "Content-Disposition": f"attachment; filename={filename}"
-        },
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
 
-@app.route('/resume_from_file', methods=['POST'])
+
+# =========================================================
+# 20) RESUME FROM FILE : importer JSON -> nouvelle session
+# =========================================================
+@app.route("/resume_from_file", methods=["POST"])
 def resume_from_file():
-    resume_file = request.files.get('resume_file')
+    """
+    Crée une nouvelle session à partir d'un fichier JSON exporté.
+    Logique :
+    - Si history contient déjà N stories, on reprend à l'index N.
+    - Si toutes les stories sont jouées, status=finished et index=dernière.
+    - On ne recrée que l'organisateur comme participant actif.
+    """
+    resume_file = request.files.get("resume_file")
     if not resume_file or not resume_file.filename:
-        return redirect(url_for('create'))
+        return redirect(url_for("create"))
 
     try:
         imported_state = json.load(resume_file.stream)
@@ -786,25 +832,25 @@ def resume_from_file():
     stories = data.get("userStories", [])
     history = data.get("history", [])
 
-    # Nombre de stories déjà jouées
     completed_count = len(history)
 
-    # Calcul du nouvel index de story
-    if completed_count >= len(stories):
-        # Toutes les stories ont déjà été jouées -> partie finie
+    if completed_count >= len(stories) and len(stories) > 0:
         new_status = "finished"
-        new_index = max(0, len(stories) - 1)
+        new_index = len(stories) - 1
     else:
-        # On reprend sur la première story non encore dans l'historique
         new_status = "waiting"
         new_index = completed_count
 
+    # Générer un code unique
     session_id = generate_session_id()
-    session_ref = db.collection('sessions').document(session_id)
+    session_ref = _session_ref(session_id)
+    while session_ref.get().exists:
+        session_id = generate_session_id()
+        session_ref = _session_ref(session_id)
 
     organizer = data.get("organizer", "Organisateur")
 
-    # Avatar de l'organisateur (si présent dans les anciens participants)
+    # Retrouver avatar orga si présent
     avatar_seed = AVATAR_SEEDS[0]
     for p in data.get("participants", []):
         if p.get("name") == organizer:
@@ -818,14 +864,14 @@ def resume_from_file():
         "currentStoryIndex": new_index,
         "reveal": False,
         "final_result": None,
-        "history": history,             # on garde l'historique pour la colonne de gauche
+        "history": history,
         "gameMode": data.get("gameMode", "strict"),
         "round_number": data.get("round_number", 1),
         "timePerStory": data.get("timePerStory", 5),
         "timerStart": None,
     })
 
-    # On NE recrée que l'organisateur comme participant actif
+    # Recréer seulement l'organisateur
     session_ref.collection("participants").add({
         "name": organizer,
         "vote": None,
@@ -837,66 +883,12 @@ def resume_from_file():
     session["session_id"] = session_id
     session["avatarSeed"] = avatar_seed
 
-    return redirect(url_for('waiting', session_id=session_id))
+    return redirect(url_for("waiting", session_id=session_id))
 
-    """Créer une nouvelle session à partir d'un fichier JSON exporté."""
-    resume_file = request.files.get('resume_file')
-    if not resume_file or not resume_file.filename:
-        return redirect(url_for('create'))
 
-    try:
-        imported_state = json.load(resume_file.stream)
-    except Exception:
-        return "Fichier JSON invalide", 400
-
-    data = imported_state or {}
-
-    session_id = generate_session_id()
-    session_ref = db.collection('sessions').document(session_id)
-
-    # On récupère l'organisateur d'origine
-    organizer = data.get("organizer", "Organisateur")
-
-    # On essaie de retrouver son avatar dans la liste des anciens participants
-    avatar_seed = AVATAR_SEEDS[0]
-    for p in data.get("participants", []):
-        if p.get("name") == organizer:
-            avatar_seed = p.get("avatarSeed", AVATAR_SEEDS[0])
-            break
-
-    # Création de la nouvelle session à partir de l'état importé
-    session_ref.set({
-        "organizer": organizer,
-        "status": "waiting",  # on repart en salle d'attente
-        "userStories": data.get("userStories", []),
-        "currentStoryIndex": data.get("currentStoryIndex", 0),
-        "reveal": False,
-        "final_result": None,
-        "history": data.get("history", []),  # conserve les votes passés
-        "gameMode": data.get("gameMode", "strict"),
-        "round_number": data.get("round_number", 1),
-        "timePerStory": data.get("timePerStory", 5),
-        "timerStart": None,
-    })
-
-    # IMPORTANT : on ne recrée QUE l'organisateur comme participant actif
-    session_ref.collection("participants").add({
-        "name": organizer,
-        "vote": None,
-        "avatarSeed": avatar_seed,
-        "hasVoted": False,
-    })
-
-    # On connecte l'organisateur à cette nouvelle session
-    session["username"] = organizer
-    session["session_id"] = session_id
-    session["avatarSeed"] = avatar_seed
-
-    # Direction la salle d'attente directement
-    return redirect(url_for('waiting', session_id=session_id))
-
-# ---------------------------------------------------------
-# Point d’entrée de l’application Flask (mode debug dev)
-# ---------------------------------------------------------
-if __name__ == '__main__':
+# =========================================================
+# 21) Point d’entrée
+# =========================================================
+if __name__ == "__main__":
+    # En prod (Render), c'est gunicorn qui démarre l'app.
     app.run(debug=True)

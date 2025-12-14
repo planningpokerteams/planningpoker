@@ -26,15 +26,12 @@
 
 /**
  * @typedef {Object} GameConfig
- * @property {string} sessionId       - Identifiant/code de session (ex: "AB12CD")
- * @property {string} currentUser     - Pseudo du joueur courant
- * @property {boolean} isOrganizer    - True si le joueur courant est l'organisateur
+ * @property {string} sessionId
+ * @property {string} currentUser
+ * @property {boolean} isOrganizer
  */
 
 /**
- * Statuts possibles d'une session.
- * (On le sépare de GameState pour éviter les syntaxes TS du type GameState["status"],
- * que JSDoc ne sait pas parser.)
  * @typedef {"waiting"|"started"|"paused"|"finished"} GameStatus
  */
 
@@ -63,14 +60,14 @@
 /**
  * @typedef {Object} GameState
  * @property {GameStatus} status
- * @property {string} gameMode               - "strict" | "average" | "median" | "abs" | "rel"
+ * @property {"strict"|"average"|"median"|"abs"|"rel"} gameMode
  * @property {number} roundNumber
  * @property {string|null} currentStory
  * @property {boolean} reveal
  * @property {Participant[]} participants
  * @property {HistoryEntry[]} history
- * @property {number} timePerStory           - minutes
- * @property {number|null} timerStart        - timestamp (secondes) côté serveur
+ * @property {number} timePerStory
+ * @property {number|null} timerStart
  * @property {boolean} [allVoted]
  * @property {boolean} [allCafe]
  * @property {boolean} [unanimous]
@@ -82,7 +79,7 @@
  * @typedef {Object} ChatMessage
  * @property {string} sender
  * @property {string} text
- * @property {number} ts   - timestamp en secondes
+ * @property {number} ts
  */
 
 /* ========================================================================== */
@@ -131,33 +128,39 @@ const chatSend = document.getElementById("chat-send");
 
 /** @type {number|string|null} */
 let lastComputedResult = null;
+// Dernière estimation calculée pour la story
 
-/** @type {string} */
+/** @type {"strict"|"average"|"median"|"abs"|"rel"} */
 let lastGameMode = "strict";
+// Mode de calcul courant
 
 /** @type {number} */
 let lastRoundNumber = 1;
+// Numéro de tour courant
 
 /** @type {number} */
 let timerPerStorySeconds = 0;
+// Durée de la story en secondes
 
 /** @type {number|null} */
 let timerStartTimestamp = null;
+// Timestamp serveur (secondes)
 
 /** @type {GameStatus} */
 let lastStatus = "waiting";
+// Statut de session
 
 /** @type {boolean} */
 let timeExpiredHandled = false;
+// Anti-double appel /next_story à la fin du timer
 
 /* ========================================================================== */
 /* 5) Helpers UI                                                              */
 /* ========================================================================== */
 
 /**
- * Active/désactive toutes les cartes de vote (utile en pause / fin de partie).
+ * Active/désactive toutes les cartes de vote.
  * @param {boolean} enabled
- * @returns {void}
  */
 function setCardsEnabled(enabled) {
   cards.forEach((card) => {
@@ -167,10 +170,7 @@ function setCardsEnabled(enabled) {
 }
 
 /**
- * Place les “sièges” (.player-seat) en cercle autour de la table.
- * - Suppose que `pokerTable` existe.
- * - Ne fait rien si aucun siège.
- * @returns {void}
+ * Place les sièges (.player-seat) en cercle autour de la table.
  */
 function layoutSeats() {
   if (!pokerTable) return;
@@ -192,25 +192,22 @@ function layoutSeats() {
 }
 
 /* ========================================================================== */
-/* 6) Vote — clic sur une carte                                               */
+/* 6) Vote — clic sur une carte                                                */
 /* ========================================================================== */
 
 cards.forEach((card) => {
   card.addEventListener("click", () => {
-    if (card.disabled) return; // pause/fin
+    if (card.disabled) return;
 
     const value = card.getAttribute("data-value");
     if (!value) return;
 
-    // Visuel : une seule carte sélectionnée à la fois
     cards.forEach((c) => c.classList.remove("poker-card--selected"));
     card.classList.add("poker-card--selected");
 
-    // Submit vote
     if (voteInput) voteInput.value = value;
     if (tableStatus) {
-      tableStatus.textContent =
-        "Ton vote est enregistré. En attente des autres joueurs.";
+      tableStatus.textContent = "Ton vote est enregistré. En attente des autres joueurs.";
     }
 
     if (voteForm) voteForm.submit();
@@ -221,11 +218,10 @@ cards.forEach((card) => {
 /* 7) Calculs locaux (moyenne / médiane / majorités)                           */
 /* ========================================================================== */
 
-/** Deck Fibonacci simplifié */
+/** @type {number[]} */
 const PLANNING_DECK = [1, 2, 3, 5, 8, 13];
 
 /**
- * Retourne la carte du deck la plus proche d’une valeur.
  * @param {number} value
  * @returns {number}
  */
@@ -245,7 +241,6 @@ function nearestCard(value) {
 }
 
 /**
- * Calcule la moyenne et renvoie la carte la plus proche.
  * @param {number[]} votes
  * @returns {{avg:number, card:number}}
  */
@@ -256,7 +251,6 @@ function computeAverage(votes) {
 }
 
 /**
- * Calcule la médiane et renvoie la carte la plus proche.
  * @param {number[]} votes
  * @returns {{median:number, card:number}}
  */
@@ -274,7 +268,6 @@ function computeMedian(votes) {
 }
 
 /**
- * Compte les occurrences de chaque valeur.
  * @param {number[]} votes
  * @returns {Record<string, number>}
  */
@@ -288,14 +281,11 @@ function computeCounts(votes) {
 }
 
 /* ========================================================================== */
-/* 8) Timer (affichage côté client)                                           */
+/* 8) Timer (affichage côté client)                                            */
 /* ========================================================================== */
 
 /**
- * Met à jour la durée (minutes → secondes) + le point de départ serveur.
- * Réinitialise le garde-fou `timeExpiredHandled` si le timer redémarre.
  * @param {GameState} data
- * @returns {void}
  */
 function updateTimerFromData(data) {
   timerPerStorySeconds = (data.timePerStory || 0) * 60;
@@ -307,19 +297,11 @@ function updateTimerFromData(data) {
   }
 }
 
-/**
- * Tick du timer :
- * - Affiche mm:ss
- * - Ajoute la classe "timer-danger" sur la dernière minute
- * - À 00:00 (et si organisateur) → POST /next_story + refresh
- * @returns {void}
- */
 function tickStoryTimer() {
   if (!storyTimerEl) return;
   const span = storyTimerEl.querySelector("span");
   if (!span) return;
 
-  // Pas de timer ou partie non en cours
   if (!timerPerStorySeconds || !timerStartTimestamp || lastStatus !== "started") {
     storyTimerEl.classList.remove("timer-danger");
     span.textContent = lastStatus === "finished" ? "FIN" : "--:--";
@@ -338,7 +320,6 @@ function tickStoryTimer() {
   if (remaining <= 60) storyTimerEl.classList.add("timer-danger");
   else storyTimerEl.classList.remove("timer-danger");
 
-  // Auto-next story pour l'orga
   if (remaining === 0 && isOrganizer && !timeExpiredHandled) {
     timeExpiredHandled = true;
     fetch(`/next_story/${sessionId}`, {
@@ -352,25 +333,15 @@ function tickStoryTimer() {
 setInterval(tickStoryTimer, 1000);
 
 /* ========================================================================== */
-/* 9) Rafraîchissement de l'état de partie                                    */
+/* 9) Rafraîchissement de l'état de partie                                     */
 /* ========================================================================== */
 
-/**
- * Construit le HTML d’avatar Dicebear (avataaars).
- * @param {string} seed
- * @param {boolean} withBg
- * @returns {string}
- */
 function dicebearUrl(seed, withBg = false) {
   const s = encodeURIComponent(seed || "astronaut");
   const bg = withBg ? "&backgroundColor=b6e3f4&radius=50" : "";
   return `https://api.dicebear.com/9.x/avataaars/svg?seed=${s}${bg}`;
 }
 
-/**
- * Rafraîchit l'état via GET /api/game/<sessionId> puis met à jour l’UI.
- * @returns {void}
- */
 function refreshGameState() {
   if (!sessionId) return;
 
@@ -379,33 +350,28 @@ function refreshGameState() {
     .then((/** @type {GameState} */ data) => {
       if (!data || data.error) return;
 
-      // ---- 1) État global
       lastGameMode = data.gameMode || "strict";
       lastRoundNumber = data.roundNumber || 1;
       lastStatus = data.status || "waiting";
 
       updateTimerFromData(data);
 
-      // ---- 2) Story + tour
       if (storyTextEl && data.currentStory) storyTextEl.textContent = data.currentStory;
       if (roundInfoEl) roundInfoEl.textContent = `Tour ${lastRoundNumber}`;
 
-      // ---- 3) Reset message global
       if (gameStatusText) {
         gameStatusText.style.display = "none";
         gameStatusText.textContent = "";
       }
 
-      // -------------------------------
-      // Affichage de l’historique
-      // -------------------------------
+      // Historique (garde anti-null)
       if (historyList) {
         historyList.innerHTML = "";
         (data.history || []).forEach((entry) => {
           const li = document.createElement("li");
           li.className = "history-item";
-          const votes = entry.votes || [];
 
+          const votes = entry.votes || [];
           const votesHtml = votes
             .map(
               (v) => `
@@ -433,9 +399,6 @@ function refreshGameState() {
         });
       }
 
-      // -------------------------------
-      // Affichage des joueurs autour de la table
-      // -------------------------------
       if (pokerTable) {
         pokerTable.querySelectorAll(".player-seat").forEach((n) => n.remove());
 
@@ -474,9 +437,7 @@ function refreshGameState() {
 
         layoutSeats();
 
-        // -------------------------------
-        // Gestion de la pause café
-        // -------------------------------
+        // Pause café
         if (data.status === "paused" && data.allCafe) {
           setCardsEnabled(false);
           if (tableStatus) tableStatus.textContent = "☕ Une pause s'impose !";
@@ -503,9 +464,7 @@ function refreshGameState() {
           if (exportBtn) exportBtn.style.display = "none";
         }
 
-        // -------------------------------
-        // Gestion de la fin de partie
-        // -------------------------------
+        // Fin de partie
         if (data.status === "finished") {
           setCardsEnabled(false);
 
@@ -530,29 +489,23 @@ function refreshGameState() {
           return;
         }
 
-        // -------------------------------
-        // Partie en cours (non en pause)
-        // -------------------------------
         setCardsEnabled(true);
 
-        // ---------- Avant révélation des cartes ----------
+        // Avant reveal
         if (!data.reveal) {
           lastComputedResult = null;
 
           if (tableStatus) {
             if (meHasVoted) {
               if (!isOrganizer && !data.allVoted) {
-                tableStatus.textContent =
-                  "Ton vote est enregistré. En attente des autres joueurs.";
+                tableStatus.textContent = "Ton vote est enregistré. En attente des autres joueurs.";
               } else if (!isOrganizer && data.allVoted) {
                 tableStatus.textContent =
                   "Tous les votes sont enregistrés. En attente que l’organisateur révèle les cartes.";
               } else if (isOrganizer && !data.allVoted) {
-                tableStatus.textContent =
-                  "Ton vote est enregistré. En attente que tout le monde vote.";
+                tableStatus.textContent = "Ton vote est enregistré. En attente que tout le monde vote.";
               } else {
-                tableStatus.textContent =
-                  "Tout le monde a voté, tu peux révéler les cartes.";
+                tableStatus.textContent = "Tout le monde a voté, tu peux révéler les cartes.";
               }
             } else {
               tableStatus.textContent = "Clique sur une carte pour voter.";
@@ -563,8 +516,7 @@ function refreshGameState() {
             if (data.allVoted) {
               revealButton.style.display = "inline-block";
               revealButton.disabled = false;
-              revealHint.textContent =
-                "Tout le monde a voté, tu peux révéler les cartes.";
+              revealHint.textContent = "Tout le monde a voté, tu peux révéler les cartes.";
             } else {
               revealButton.style.display = "none";
               revealHint.textContent = "En attente des votes…";
@@ -578,14 +530,13 @@ function refreshGameState() {
           return;
         }
 
-        // ---------- Après révélation des cartes ----------
+        // Après reveal
         const allVotesCount = (data.participants || []).length;
         const rawVotes = (data.participants || []).map((p) => p.vote);
         const numericVotes = rawVotes
           .map((v) => parseInt(String(v), 10))
           .filter(Number.isFinite);
 
-        // Unanimité : priorité backend si dispo
         let unanimity = false;
         let unanimousValue = null;
 
@@ -605,17 +556,12 @@ function refreshGameState() {
         if (revealButton) revealButton.style.display = "none";
         if (revealHint) revealHint.textContent = "Les cartes sont révélées.";
 
-        // ----- Mode strict (unanimité requise) -----
         if (isStrictTurn) {
           if (unanimity && numericVotes.length) {
             const val = numericVotes[0];
             lastComputedResult = val;
 
-            if (tableStatus) {
-              tableStatus.textContent =
-                `✅ Unanimité atteinte (mode strict) : ${val}`;
-            }
-
+            if (tableStatus) tableStatus.textContent = `✅ Unanimité atteinte (mode strict) : ${val}`;
             if (isOrganizer && nextBtn) nextBtn.style.display = "block";
             if (revoteBtn) revoteBtn.style.display = "none";
             if (forceNextBtn) forceNextBtn.style.display = "none";
@@ -635,13 +581,11 @@ function refreshGameState() {
           return;
         }
 
-        // ----- Modes automatiques (moyenne, médiane, majorités) -----
         if (!numericVotes.length) {
           lastComputedResult = null;
 
           if (tableStatus) {
-            tableStatus.textContent =
-              "Les joueurs n'ont pas choisi de valeur numérique (café / ?).";
+            tableStatus.textContent = "Les joueurs n'ont pas choisi de valeur numérique (café / ?).";
           }
 
           if (isOrganizer && revoteBtn) revoteBtn.style.display = "block";
@@ -682,11 +626,9 @@ function refreshGameState() {
 
           if (bestVal !== null && bestCount > allVotesCount / 2) {
             result = bestVal;
-            message =
-              `Valeur ${bestVal} choisie par ${bestCount}/${allVotesCount} joueurs.`;
+            message = `Valeur ${bestVal} choisie par ${bestCount}/${allVotesCount} joueurs.`;
           } else {
-            message =
-              "Pas de majorité absolue claire. Discutez et revotez si besoin.";
+            message = "Pas de majorité absolue claire. Discutez et revotez si besoin.";
           }
         } else if (lastGameMode === "rel") {
           label = "Majorité relative";
@@ -709,11 +651,9 @@ function refreshGameState() {
 
           if (bestVal !== null && !tie) {
             result = bestVal;
-            message =
-              `Valeur ${bestVal} majoritaire (${bestCount}/${allVotesCount} votes).`;
+            message = `Valeur ${bestVal} majoritaire (${bestCount}/${allVotesCount} votes).`;
           } else {
-            message =
-              "Pas de majorité relative claire (égalité). Discutez et revotez si besoin.";
+            message = "Pas de majorité relative claire (égalité). Discutez et revotez si besoin.";
           }
         }
 
@@ -740,9 +680,7 @@ function refreshGameState() {
         }
       }
     })
-    .catch(() => {
-      // Silence : on évite de spam console en prod
-    });
+    .catch(() => {});
 }
 
 setInterval(refreshGameState, 2000);
@@ -753,11 +691,6 @@ window.addEventListener("resize", layoutSeats);
 /* 10) Chat : rendu, sécurité HTML, polling, envoi                             */
 /* ========================================================================== */
 
-/**
- * Échappe une string pour éviter l’injection HTML dans le chat.
- * @param {string} s
- * @returns {string}
- */
 function escapeHtml(s) {
   if (!s) return "";
   return String(s).replace(/[&<>\"']/g, (c) => {
@@ -765,11 +698,6 @@ function escapeHtml(s) {
   });
 }
 
-/**
- * Rend la liste de messages dans #chat-messages.
- * @param {ChatMessage[]} msgs
- * @returns {void}
- */
 function renderChatMessages(msgs) {
   if (!chatMessages) return;
 
@@ -792,11 +720,6 @@ function renderChatMessages(msgs) {
 /** @type {number} */
 let lastChatFetch = 0;
 
-/**
- * Récupère les messages via GET /api/chat/<sessionId> (si le panneau est visible).
- * Throttle à 1 requête / seconde max.
- * @returns {void}
- */
 function fetchChat() {
   if (!sessionId) return;
   if (!chatPanel || chatPanel.style.display === "none") return;
@@ -814,14 +737,8 @@ function fetchChat() {
     .catch(() => {});
 }
 
-// Poll chat régulièrement (le “if panneau visible” évite de spam)
 setInterval(fetchChat, 2000);
 
-/**
- * Envoie un message via POST /api/chat/<sessionId>
- * @param {string} text
- * @returns {Promise<void>}
- */
 function sendChatMessage(text) {
   if (!sessionId) return Promise.resolve();
 
@@ -872,7 +789,6 @@ if (nextBtn) {
 if (revoteBtn) {
   revoteBtn.addEventListener("click", () => {
     fetch(`/revote/${sessionId}`, { method: "POST" }).then(() => {
-      // Lorsqu'on relance le vote, fermer le chat
       if (chatPanel) chatPanel.style.display = "none";
       if (chatButton) chatButton.style.display = "none";
       refreshGameState();

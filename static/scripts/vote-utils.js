@@ -1,44 +1,53 @@
+// static/scripts/vote-utils.js
+
 /**
- * @file vote-utils.js
- * @description
- * Fonctions utilitaires *pures* utilisées par l'UI et surtout par les tests Jest.
- * Ici on ne touche pas au DOM : on calcule des stats (moyenne, médiane, etc.)
- * et on mappe une valeur sur la carte Planning Poker la plus proche.
+ * vote-utils.js — Fonctions utilitaires (calculs Planning Poker)
+ * --------------------------------------------------------------
+ * Ce fichier est utilisé :
+ * - côté navigateur (via <script>)
+ * - côté tests Jest (via require / CommonJS)
  *
- * Ce fichier est chargé côté Node (tests) via `require(...)`.
+ * IMPORTANT :
+ * - On exporte en CommonJS si `module.exports` existe (tests)
+ * - Sinon, on expose sur `window.VoteUtils` (navigateur)
  */
 
 /**
- * Set de cartes Planning Poker autorisées.
+ * Deck Fibonacci simplifié (cartes disponibles).
  * @type {number[]}
  */
-const CARDS = [0, 0.5, 1, 2, 3, 5, 8, 13, 20, 40, 100];
+const PLANNING_DECK = [1, 2, 3, 5, 8, 13];
 
 /**
- * Trouve la carte Planning Poker la plus proche de `value`.
- * @param {number} value - Valeur cible (moyenne/médiane/etc.).
- * @returns {(number|null)} Carte la plus proche, ou null si `value` n'est pas un nombre.
+ * Retourne la carte du deck la plus proche d’une valeur.
+ * @param {number} value
+ * @returns {number}
  */
 function nearestCard(value) {
-  if (typeof value !== "number" || Number.isNaN(value)) return null;
+  let best = PLANNING_DECK[0];
+  let bestDiff = Math.abs(value - best);
 
-  let best = CARDS[0];
-  let bestDist = Math.abs(value - best);
-
-  for (let i = 1; i < CARDS.length; i++) {
-    const d = Math.abs(value - CARDS[i]);
-    if (d < bestDist) {
-      bestDist = d;
-      best = CARDS[i];
+  PLANNING_DECK.forEach((v) => {
+    const d = Math.abs(value - v);
+    if (d < bestDiff) {
+      bestDiff = d;
+      best = v;
     }
-  }
+  });
+
   return best;
 }
 
 /**
- * Calcule la moyenne des votes numériques et la carte la plus proche.
- * @param {number[]} votes - Liste de votes (ex: [1, 2, 3]).
- * @returns {{avg:number, card:(number|null)}} Résultat (moyenne + carte la plus proche).
+ * @typedef {Object} AverageResult
+ * @property {number} avg  - Moyenne brute
+ * @property {number} card - Carte du deck la plus proche
+ */
+
+/**
+ * Calcule la moyenne et renvoie la carte la plus proche.
+ * @param {number[]} votes
+ * @returns {AverageResult}
  */
 function computeAverage(votes) {
   const sum = votes.reduce((a, b) => a + b, 0);
@@ -47,14 +56,20 @@ function computeAverage(votes) {
 }
 
 /**
- * Calcule la médiane des votes numériques et la carte la plus proche.
- * @param {number[]} votes - Liste de votes (ex: [1, 2, 3]).
- * @returns {{median:number, card:(number|null)}} Résultat (médiane + carte la plus proche).
+ * @typedef {Object} MedianResult
+ * @property {number} median - Médiane brute
+ * @property {number} card   - Carte du deck la plus proche
+ */
+
+/**
+ * Calcule la médiane et renvoie la carte la plus proche.
+ * @param {number[]} votes
+ * @returns {MedianResult}
  */
 function computeMedian(votes) {
   const sorted = [...votes].sort((a, b) => a - b);
-  let median;
 
+  let median;
   if (sorted.length % 2 === 1) {
     median = sorted[(sorted.length - 1) / 2];
   } else {
@@ -64,4 +79,38 @@ function computeMedian(votes) {
   return { median, card: nearestCard(median) };
 }
 
-module.exports = { nearestCard, computeAverage, computeMedian, CARDS };
+/**
+ * Compte les occurrences de chaque valeur.
+ * @param {number[]} votes
+ * @returns {Record<string, number>}
+ */
+function computeCounts(votes) {
+  /** @type {Record<string, number>} */
+  const counts = {};
+  votes.forEach((v) => {
+    counts[v] = (counts[v] || 0) + 1;
+  });
+  return counts;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Exports                                                                     */
+/* -------------------------------------------------------------------------- */
+
+const api = {
+  PLANNING_DECK,
+  nearestCard,
+  computeAverage,
+  computeMedian,
+  computeCounts,
+};
+
+// CommonJS (Jest / Node)
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = api;
+}
+
+// Browser global (optionnel, pratique si tu veux t'en servir ailleurs)
+if (typeof window !== "undefined") {
+  window.VoteUtils = api;
+}
