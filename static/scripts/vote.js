@@ -1,4 +1,5 @@
 /**
+ * @fileoverview
  * vote.js — Gestion de la page de vote (Planning Poker)
  * -----------------------------------------------------
  * Responsabilités :
@@ -32,6 +33,7 @@
  */
 
 /**
+ * Statuts possibles d'une partie.
  * @typedef {"waiting"|"started"|"paused"|"finished"} GameStatus
  */
 
@@ -39,7 +41,7 @@
  * @typedef {Object} Participant
  * @property {string} name
  * @property {string} avatarSeed
- * @property {string|null} vote
+ * @property {string|number|null} vote
  * @property {boolean} hasVoted
  */
 
@@ -47,7 +49,7 @@
  * @typedef {Object} HistoryVoteEntry
  * @property {string} name
  * @property {string} avatar
- * @property {string|null} vote
+ * @property {string|number|null} vote
  */
 
 /**
@@ -60,7 +62,7 @@
 /**
  * @typedef {Object} GameState
  * @property {GameStatus} status
- * @property {"strict"|"average"|"median"|"abs"|"rel"} gameMode
+ * @property {string} gameMode - "strict" | "average" | "median" | "abs" | "rel"
  * @property {number} roundNumber
  * @property {string|null} currentStory
  * @property {boolean} reveal
@@ -83,14 +85,14 @@
  */
 
 /* ========================================================================== */
-/* 2) Configuration globale (injectée par Jinja)                              */
+/* 2) Config globale (injectée par Jinja)                                      */
 /* ========================================================================== */
 
 /** @type {GameConfig} */
 const { sessionId, currentUser, isOrganizer } = window.GAME_CONFIG || {};
 
 /* ========================================================================== */
-/* 3) Sélection des éléments DOM                                              */
+/* 3) DOM                                                                     */
 /* ========================================================================== */
 
 const cards = document.querySelectorAll(".poker-card");
@@ -123,44 +125,38 @@ const chatInput = document.getElementById("chat-input");
 const chatSend = document.getElementById("chat-send");
 
 /* ========================================================================== */
-/* 4) État local côté client                                                  */
+/* 4) État local                                                              */
 /* ========================================================================== */
 
 /** @type {number|string|null} */
 let lastComputedResult = null;
-// Dernière estimation calculée pour la story
 
-/** @type {"strict"|"average"|"median"|"abs"|"rel"} */
+/** @type {string} */
 let lastGameMode = "strict";
-// Mode de calcul courant
 
 /** @type {number} */
 let lastRoundNumber = 1;
-// Numéro de tour courant
 
 /** @type {number} */
 let timerPerStorySeconds = 0;
-// Durée de la story en secondes
 
 /** @type {number|null} */
 let timerStartTimestamp = null;
-// Timestamp serveur (secondes)
 
 /** @type {GameStatus} */
 let lastStatus = "waiting";
-// Statut de session
 
 /** @type {boolean} */
 let timeExpiredHandled = false;
-// Anti-double appel /next_story à la fin du timer
 
 /* ========================================================================== */
 /* 5) Helpers UI                                                              */
 /* ========================================================================== */
 
 /**
- * Active/désactive toutes les cartes de vote.
+ * Active/désactive toutes les cartes de vote (pause / fin).
  * @param {boolean} enabled
+ * @returns {void}
  */
 function setCardsEnabled(enabled) {
   cards.forEach((card) => {
@@ -170,7 +166,8 @@ function setCardsEnabled(enabled) {
 }
 
 /**
- * Place les sièges (.player-seat) en cercle autour de la table.
+ * Place les sièges joueurs (.player-seat) en cercle autour de la table.
+ * @returns {void}
  */
 function layoutSeats() {
   if (!pokerTable) return;
@@ -192,7 +189,7 @@ function layoutSeats() {
 }
 
 /* ========================================================================== */
-/* 6) Vote — clic sur une carte                                                */
+/* 6) Vote — clic carte                                                       */
 /* ========================================================================== */
 
 cards.forEach((card) => {
@@ -206,8 +203,10 @@ cards.forEach((card) => {
     card.classList.add("poker-card--selected");
 
     if (voteInput) voteInput.value = value;
+
     if (tableStatus) {
-      tableStatus.textContent = "Ton vote est enregistré. En attente des autres joueurs.";
+      tableStatus.textContent =
+        "Ton vote est enregistré. En attente des autres joueurs.";
     }
 
     if (voteForm) voteForm.submit();
@@ -215,7 +214,7 @@ cards.forEach((card) => {
 });
 
 /* ========================================================================== */
-/* 7) Calculs locaux (moyenne / médiane / majorités)                           */
+/* 7) Calculs locaux                                                          */
 /* ========================================================================== */
 
 /** @type {number[]} */
@@ -241,8 +240,14 @@ function nearestCard(value) {
 }
 
 /**
+ * @typedef {Object} AverageResult
+ * @property {number} avg
+ * @property {number} card
+ */
+
+/**
  * @param {number[]} votes
- * @returns {{avg:number, card:number}}
+ * @returns {AverageResult}
  */
 function computeAverage(votes) {
   const sum = votes.reduce((a, b) => a + b, 0);
@@ -251,8 +256,14 @@ function computeAverage(votes) {
 }
 
 /**
+ * @typedef {Object} MedianResult
+ * @property {number} median
+ * @property {number} card
+ */
+
+/**
  * @param {number[]} votes
- * @returns {{median:number, card:number}}
+ * @returns {MedianResult}
  */
 function computeMedian(votes) {
   const sorted = [...votes].sort((a, b) => a - b);
@@ -268,24 +279,31 @@ function computeMedian(votes) {
 }
 
 /**
+ * @typedef {Object.<string, number>} VoteCounts
+ */
+
+/**
  * @param {number[]} votes
- * @returns {Record<string, number>}
+ * @returns {VoteCounts}
  */
 function computeCounts(votes) {
-  /** @type {Record<string, number>} */
+  /** @type {VoteCounts} */
   const counts = {};
   votes.forEach((v) => {
-    counts[v] = (counts[v] || 0) + 1;
+    const key = String(v);
+    counts[key] = (counts[key] || 0) + 1;
   });
   return counts;
 }
 
 /* ========================================================================== */
-/* 8) Timer (affichage côté client)                                            */
+/* 8) Timer                                                                   */
 /* ========================================================================== */
 
 /**
+ * Met à jour la durée (minutes → secondes) + le point de départ serveur.
  * @param {GameState} data
+ * @returns {void}
  */
 function updateTimerFromData(data) {
   timerPerStorySeconds = (data.timePerStory || 0) * 60;
@@ -297,8 +315,13 @@ function updateTimerFromData(data) {
   }
 }
 
+/**
+ * Tick timer visuel + auto-next story (orga).
+ * @returns {void}
+ */
 function tickStoryTimer() {
   if (!storyTimerEl) return;
+
   const span = storyTimerEl.querySelector("span");
   if (!span) return;
 
@@ -322,6 +345,7 @@ function tickStoryTimer() {
 
   if (remaining === 0 && isOrganizer && !timeExpiredHandled) {
     timeExpiredHandled = true;
+
     fetch(`/next_story/${sessionId}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -333,15 +357,36 @@ function tickStoryTimer() {
 setInterval(tickStoryTimer, 1000);
 
 /* ========================================================================== */
-/* 9) Rafraîchissement de l'état de partie                                     */
+/* 9) Rafraîchissement état                                                   */
 /* ========================================================================== */
 
-function dicebearUrl(seed, withBg = false) {
+/**
+ * @param {string} seed
+ * @param {boolean} withBg
+ * @returns {string}
+ */
+function dicebearUrl(seed, withBg) {
   const s = encodeURIComponent(seed || "astronaut");
   const bg = withBg ? "&backgroundColor=b6e3f4&radius=50" : "";
   return `https://api.dicebear.com/9.x/avataaars/svg?seed=${s}${bg}`;
 }
 
+/**
+ * Sécurise une string (anti injection HTML).
+ * @param {string} s
+ * @returns {string}
+ */
+function escapeHtml(s) {
+  if (!s) return "";
+  return String(s).replace(/[&<>\"']/g, (c) => {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+  });
+}
+
+/**
+ * Appelle /api/game/<sessionId> et met à jour l’UI.
+ * @returns {void}
+ */
 function refreshGameState() {
   if (!sessionId) return;
 
@@ -364,7 +409,7 @@ function refreshGameState() {
         gameStatusText.textContent = "";
       }
 
-      // Historique (garde anti-null)
+      // Historique (safe même si absent en DOM)
       if (historyList) {
         historyList.innerHTML = "";
         (data.history || []).forEach((entry) => {
@@ -399,6 +444,7 @@ function refreshGameState() {
         });
       }
 
+      // Joueurs autour de la table
       if (pokerTable) {
         pokerTable.querySelectorAll(".player-seat").forEach((n) => n.remove());
 
@@ -411,7 +457,7 @@ function refreshGameState() {
 
           const img = document.createElement("img");
           img.className = "player-avatar";
-          img.src = dicebearUrl(p.avatarSeed || "astronaut");
+          img.src = dicebearUrl(p.avatarSeed || "astronaut", false);
           seat.appendChild(img);
 
           const name = document.createElement("div");
@@ -419,17 +465,18 @@ function refreshGameState() {
           name.textContent = p.name;
           seat.appendChild(name);
 
-          const s = document.createElement("div");
-          s.className = "player-status";
+          const st = document.createElement("div");
+          st.className = "player-status";
 
           if (data.reveal) {
             seat.classList.add("revealed");
-            s.textContent = p.vote !== null && p.vote !== undefined ? String(p.vote) : "—";
+            st.textContent =
+              p.vote !== null && p.vote !== undefined ? String(p.vote) : "—";
           } else {
-            s.textContent = p.hasVoted ? "A voté" : "En attente";
+            st.textContent = p.hasVoted ? "A voté" : "En attente";
           }
 
-          seat.appendChild(s);
+          seat.appendChild(st);
           pokerTable.appendChild(seat);
 
           if (p.name === currentUser && p.hasVoted) meHasVoted = true;
@@ -464,7 +511,7 @@ function refreshGameState() {
           if (exportBtn) exportBtn.style.display = "none";
         }
 
-        // Fin de partie
+        // Fin partie
         if (data.status === "finished") {
           setCardsEnabled(false);
 
@@ -489,23 +536,27 @@ function refreshGameState() {
           return;
         }
 
+        // Partie en cours
         setCardsEnabled(true);
 
-        // Avant reveal
+        // AVANT reveal
         if (!data.reveal) {
           lastComputedResult = null;
 
           if (tableStatus) {
             if (meHasVoted) {
               if (!isOrganizer && !data.allVoted) {
-                tableStatus.textContent = "Ton vote est enregistré. En attente des autres joueurs.";
+                tableStatus.textContent =
+                  "Ton vote est enregistré. En attente des autres joueurs.";
               } else if (!isOrganizer && data.allVoted) {
                 tableStatus.textContent =
                   "Tous les votes sont enregistrés. En attente que l’organisateur révèle les cartes.";
               } else if (isOrganizer && !data.allVoted) {
-                tableStatus.textContent = "Ton vote est enregistré. En attente que tout le monde vote.";
+                tableStatus.textContent =
+                  "Ton vote est enregistré. En attente que tout le monde vote.";
               } else {
-                tableStatus.textContent = "Tout le monde a voté, tu peux révéler les cartes.";
+                tableStatus.textContent =
+                  "Tout le monde a voté, tu peux révéler les cartes.";
               }
             } else {
               tableStatus.textContent = "Clique sur une carte pour voter.";
@@ -516,7 +567,8 @@ function refreshGameState() {
             if (data.allVoted) {
               revealButton.style.display = "inline-block";
               revealButton.disabled = false;
-              revealHint.textContent = "Tout le monde a voté, tu peux révéler les cartes.";
+              revealHint.textContent =
+                "Tout le monde a voté, tu peux révéler les cartes.";
             } else {
               revealButton.style.display = "none";
               revealHint.textContent = "En attente des votes…";
@@ -530,7 +582,7 @@ function refreshGameState() {
           return;
         }
 
-        // Après reveal
+        // APRÈS reveal
         const allVotesCount = (data.participants || []).length;
         const rawVotes = (data.participants || []).map((p) => p.vote);
         const numericVotes = rawVotes
@@ -543,11 +595,9 @@ function refreshGameState() {
         if (typeof data.unanimous !== "undefined") {
           unanimity = !!data.unanimous;
           unanimousValue = data.unanimousValue ?? null;
-        } else {
-          if (numericVotes.length === allVotesCount && allVotesCount > 0) {
-            unanimity = numericVotes.every((v) => v === numericVotes[0]);
-            if (unanimity) unanimousValue = numericVotes[0];
-          }
+        } else if (numericVotes.length === allVotesCount && allVotesCount > 0) {
+          unanimity = numericVotes.every((v) => v === numericVotes[0]);
+          if (unanimity) unanimousValue = numericVotes[0];
         }
 
         const strictModeAlways = lastGameMode === "strict";
@@ -556,12 +606,16 @@ function refreshGameState() {
         if (revealButton) revealButton.style.display = "none";
         if (revealHint) revealHint.textContent = "Les cartes sont révélées.";
 
+        // Strict
         if (isStrictTurn) {
           if (unanimity && numericVotes.length) {
             const val = numericVotes[0];
             lastComputedResult = val;
 
-            if (tableStatus) tableStatus.textContent = `✅ Unanimité atteinte (mode strict) : ${val}`;
+            if (tableStatus) {
+              tableStatus.textContent = `✅ Unanimité atteinte (mode strict) : ${val}`;
+            }
+
             if (isOrganizer && nextBtn) nextBtn.style.display = "block";
             if (revoteBtn) revoteBtn.style.display = "none";
             if (forceNextBtn) forceNextBtn.style.display = "none";
@@ -581,11 +635,13 @@ function refreshGameState() {
           return;
         }
 
+        // Auto modes
         if (!numericVotes.length) {
           lastComputedResult = null;
 
           if (tableStatus) {
-            tableStatus.textContent = "Les joueurs n'ont pas choisi de valeur numérique (café / ?).";
+            tableStatus.textContent =
+              "Les joueurs n'ont pas choisi de valeur numérique (café / ?).";
           }
 
           if (isOrganizer && revoteBtn) revoteBtn.style.display = "block";
@@ -601,14 +657,14 @@ function refreshGameState() {
 
         if (lastGameMode === "average") {
           label = "Moyenne";
-          const { avg, card } = computeAverage(numericVotes);
-          result = card;
-          message = `Moyenne = ${avg.toFixed(2)} → carte la plus proche : ${card}`;
+          const r = computeAverage(numericVotes);
+          result = r.card;
+          message = `Moyenne = ${r.avg.toFixed(2)} → carte la plus proche : ${r.card}`;
         } else if (lastGameMode === "median") {
           label = "Médiane";
-          const { median, card } = computeMedian(numericVotes);
-          result = card;
-          message = `Médiane = ${median} → carte la plus proche : ${card}`;
+          const r = computeMedian(numericVotes);
+          result = r.card;
+          message = `Médiane = ${r.median} → carte la plus proche : ${r.card}`;
         } else if (lastGameMode === "abs") {
           label = "Majorité absolue";
           const counts = computeCounts(numericVotes);
@@ -659,10 +715,7 @@ function refreshGameState() {
 
         if (result !== null) {
           lastComputedResult = result;
-
-          if (tableStatus) {
-            tableStatus.textContent = `✅ Résultat (${label}) : ${result}. ${message}`;
-          }
+          if (tableStatus) tableStatus.textContent = `✅ Résultat (${label}) : ${result}. ${message}`;
 
           if (isOrganizer && nextBtn) nextBtn.style.display = "block";
           if (isOrganizer && revoteBtn) revoteBtn.style.display = "block";
@@ -670,7 +723,6 @@ function refreshGameState() {
           if (forceNextBtn) forceNextBtn.style.display = "none";
         } else {
           lastComputedResult = null;
-
           if (tableStatus) tableStatus.textContent = `❌ ${message}`;
 
           if (isOrganizer && revoteBtn) revoteBtn.style.display = "block";
@@ -688,29 +740,23 @@ refreshGameState();
 window.addEventListener("resize", layoutSeats);
 
 /* ========================================================================== */
-/* 10) Chat : rendu, sécurité HTML, polling, envoi                             */
+/* 10) Chat : rendu, polling, envoi                                            */
 /* ========================================================================== */
 
-function escapeHtml(s) {
-  if (!s) return "";
-  return String(s).replace(/[&<>\"']/g, (c) => {
-    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
-  });
-}
-
+/**
+ * Rend les messages dans #chat-messages.
+ * @param {ChatMessage[]} msgs
+ * @returns {void}
+ */
 function renderChatMessages(msgs) {
   if (!chatMessages) return;
 
   chatMessages.innerHTML = (msgs || [])
     .map((m) => {
       const t = new Date((m.ts || 0) * 1000).toLocaleTimeString();
-      return `
-        <div class="chat-line">
-          <strong>${escapeHtml(m.sender)}:</strong>
-          ${escapeHtml(m.text)}
-          <span class="chat-ts">${t}</span>
-        </div>
-      `;
+      return `<div class="chat-line"><strong>${escapeHtml(m.sender)}:</strong> ${escapeHtml(
+        m.text
+      )} <span class="chat-ts">${t}</span></div>`;
     })
     .join("");
 
@@ -720,6 +766,10 @@ function renderChatMessages(msgs) {
 /** @type {number} */
 let lastChatFetch = 0;
 
+/**
+ * Fetch chat si panneau visible (throttle 1 req/sec).
+ * @returns {void}
+ */
 function fetchChat() {
   if (!sessionId) return;
   if (!chatPanel || chatPanel.style.display === "none") return;
@@ -739,6 +789,11 @@ function fetchChat() {
 
 setInterval(fetchChat, 2000);
 
+/**
+ * Envoie un message dans le chat.
+ * @param {string} text
+ * @returns {Promise<void>}
+ */
 function sendChatMessage(text) {
   if (!sessionId) return Promise.resolve();
 
@@ -757,7 +812,7 @@ function sendChatMessage(text) {
 
 if (chatSend) {
   chatSend.addEventListener("click", () => {
-    const text = chatInput && chatInput.value && chatInput.value.trim();
+    const text = chatInput && chatInput.value ? chatInput.value.trim() : "";
     if (!text) return;
     sendChatMessage(text);
   });
@@ -773,7 +828,7 @@ if (chatSend) {
 }
 
 /* ========================================================================== */
-/* 11) Actions organisateur : next story / revote / resume                     */
+/* 11) Actions organisateur                                                   */
 /* ========================================================================== */
 
 if (nextBtn) {
@@ -803,12 +858,13 @@ if (resumeBtn) {
 }
 
 /* ========================================================================== */
-/* 12) UI Chat : ouverture/fermeture                                          */
+/* 12) UI Chat : toggle                                                       */
 /* ========================================================================== */
 
 if (chatButton) {
   chatButton.addEventListener("click", () => {
     if (!chatPanel) return;
+
     const isHidden = chatPanel.style.display === "none" || !chatPanel.style.display;
     chatPanel.style.display = isHidden ? "block" : "none";
 

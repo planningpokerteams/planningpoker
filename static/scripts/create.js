@@ -1,63 +1,82 @@
 /**
- * @file create.js
- * @description
- * Gère la page **Création de partie** :
+ * @fileoverview
+ * create.js — Page de création de session
+ * --------------------------------------
  * - Affiche la description du mode de jeu sélectionné
  * - Permet d'ajouter des User Stories (US)
- * - Permet de réordonner les US en drag & drop
- * - Prépare les champs cachés avant l'envoi du formulaire vers le backend
+ * - Permet de réordonner les US via drag & drop
+ * - Prépare les champs hidden avant l'envoi du formulaire au backend
  */
+
+/* ========================================================================== */
+/* 1) Types (JSDoc)                                                           */
+/* ========================================================================== */
 
 /**
- * Dictionnaire des descriptions affichées selon le mode de jeu.
- * @type {Record<string, string>}
+ * Liste des descriptions par mode de jeu.
+ * @typedef {Object.<string, string>} ModeDescriptions
  */
-const MODE_DESCRIPTIONS = {
-  strict:
-    "Tous les tours sont en mode strict : il faut une unanimité sur une même carte pour valider l’estimation, sinon vous discutez et revotez.",
-  average:
-    "Tour 1 en mode strict. À partir du 2ᵉ tour, on calcule la moyenne des votes numériques et on retient la carte la plus proche.",
-  median:
-    "Tour 1 en mode strict. À partir du 2ᵉ tour, on prend la médiane des votes numériques, puis la carte la plus proche.",
-  abs:
-    "Tour 1 en mode strict. À partir du 2ᵉ tour, une valeur est retenue si elle obtient plus de 50% des votes numériques (majorité absolue).",
-  rel:
-    "Tour 1 en mode strict. À partir du 2ᵉ tour, on retient la valeur la plus votée (majorité relative), sauf en cas d’égalité.",
-};
+
+/* ========================================================================== */
+/* 2) Bootstrap DOMContentLoaded                                               */
+/* ========================================================================== */
 
 document.addEventListener("DOMContentLoaded", () => {
-  // ---------------------------------------------------------------------------
-  // 1) Récupération des éléments DOM (formulaire + liste des US)
-  // ---------------------------------------------------------------------------
+  /* ======================================================================== */
+  /* 2.1) Récupération des éléments DOM                                        */
+  /* ======================================================================== */
 
   /** @type {HTMLButtonElement|null} */
-  const addBtn = document.getElementById("add-story-btn"); // Bouton “Ajouter” une US
+  const addBtn = document.getElementById("add-story-btn");
 
   /** @type {HTMLElement|null} */
-  const storiesListEl = document.getElementById("stories-list"); // Liste visuelle des US
+  const storiesListEl = document.getElementById("stories-list");
 
   /** @type {HTMLElement|null} */
-  const storiesHidden = document.getElementById("stories-hidden"); // Conteneur des <input type="hidden">
+  const storiesHidden = document.getElementById("stories-hidden");
 
   /** @type {HTMLInputElement|null} */
-  const inputStory = document.getElementById("userStories-input"); // Champ texte US
+  const inputStory = document.getElementById("userStories-input");
 
   /** @type {HTMLFormElement|null} */
-  const form = document.getElementById("create-form"); // Formulaire “Créer”
-
-  // ---------------------------------------------------------------------------
-  // 2) Gestion “Mode de jeu” : texte explicatif qui change selon le <select>
-  // ---------------------------------------------------------------------------
+  const form = document.getElementById("create-form");
 
   /** @type {HTMLSelectElement|null} */
-  const modeSelect = document.getElementById("game_mode"); // Select du mode de jeu
+  const modeSelect = document.getElementById("game_mode");
 
   /** @type {HTMLElement|null} */
-  const modeDesc = document.getElementById("mode-description"); // Zone texte description
+  const modeDesc = document.getElementById("mode-description");
+
+  /* ======================================================================== */
+  /* 2.2) État local                                                          */
+  /* ======================================================================== */
+
+  /** @type {string[]} */
+  let stories = [];
+
+  /** @type {number|null} */
+  let draggedIndex = null;
+
+  /* ======================================================================== */
+  /* 2.3) Mode descriptions                                                    */
+  /* ======================================================================== */
+
+  /** @type {ModeDescriptions} */
+  const MODE_DESCRIPTIONS = {
+    strict:
+      "Tous les tours sont en mode strict : il faut une unanimité sur une même carte pour valider l’estimation, sinon vous discutez et revotez.",
+    average:
+      "Tour 1 en mode strict. À partir du 2ᵉ tour, on calcule la moyenne des votes numériques et on retient la carte la plus proche.",
+    median:
+      "Tour 1 en mode strict. À partir du 2ᵉ tour, on prend la médiane des votes numériques, puis la carte la plus proche.",
+    abs:
+      "Tour 1 en mode strict. À partir du 2ᵉ tour, une valeur est retenue si elle obtient plus de 50% des votes numériques (majorité absolue).",
+    rel:
+      "Tour 1 en mode strict. À partir du 2ᵉ tour, on retient la valeur la plus votée (majorité relative), sauf en cas d’égalité.",
+  };
 
   /**
-   * Met à jour le texte de description en fonction de la valeur du select.
-   * (Fallback sur "strict" si vide.)
+   * Met à jour le paragraphe de description en fonction du mode choisi.
    * @returns {void}
    */
   function updateModeDescription() {
@@ -71,24 +90,17 @@ document.addEventListener("DOMContentLoaded", () => {
     updateModeDescription();
   }
 
-  // ---------------------------------------------------------------------------
-  // 3) Gestion de la liste des User Stories : ajout + rendu + drag & drop
-  // ---------------------------------------------------------------------------
-
-  /** @type {string[]} */
-  let stories = []; // Les US dans l'ordre courant
-
-  /** @type {number|null} */
-  let draggedIndex = null; // Index de la carte en cours de drag
+  /* ======================================================================== */
+  /* 2.4) Liste US : rendu + drag & drop                                       */
+  /* ======================================================================== */
 
   /**
-   * Ré-affiche entièrement la liste des US à partir du tableau `stories`.
-   * - Reconstruit le DOM
-   * - Réattache les listeners de drag & drop
+   * Re-render la liste des user stories dans le DOM.
    * @returns {void}
    */
   function renderStories() {
     if (!storiesListEl) return;
+
     storiesListEl.innerHTML = "";
 
     stories.forEach((text, index) => {
@@ -102,27 +114,24 @@ document.addEventListener("DOMContentLoaded", () => {
         <span class="story-text">${text}</span>
       `;
 
-      // Drag start : mémorise l'index d'origine
       item.addEventListener("dragstart", (e) => {
         draggedIndex = index;
         if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
       });
 
-      // Drag over : autorise le drop + style survol
       item.addEventListener("dragover", (e) => {
         e.preventDefault();
         item.classList.add("story-item--dragover");
       });
 
-      // Drag leave : retire le style survol
       item.addEventListener("dragleave", () => {
         item.classList.remove("story-item--dragover");
       });
 
-      // Drop : réordonne le tableau puis re-render
       item.addEventListener("drop", (e) => {
         e.preventDefault();
         item.classList.remove("story-item--dragover");
+
         if (draggedIndex === null) return;
 
         const targetIndex = index;
@@ -140,7 +149,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   /**
-   * Lit le champ texte `inputStory`, ajoute l'US au tableau, puis rafraîchit l'affichage.
+   * Ajoute le contenu du champ texte à la liste `stories`.
    * @returns {void}
    */
   function addStoryFromInput() {
@@ -153,10 +162,8 @@ document.addEventListener("DOMContentLoaded", () => {
     renderStories();
   }
 
-  // Ajout via clic sur le bouton
   if (addBtn) addBtn.addEventListener("click", addStoryFromInput);
 
-  // Ajout via Entrée
   if (inputStory) {
     inputStory.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
@@ -166,23 +173,18 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // ---------------------------------------------------------------------------
-  // 4) Avant envoi du formulaire : convertir `stories` => inputs hidden
-  // ---------------------------------------------------------------------------
+  /* ======================================================================== */
+  /* 2.5) Soumission formulaire : hidden inputs + validation                   */
+  /* ======================================================================== */
 
   if (form) {
     form.addEventListener("submit", (e) => {
-      // Si une US est encore dans le champ texte, on l'ajoute d'abord
-      if (inputStory && inputStory.value.trim()) addStoryFromInput();
+      if (!storiesHidden || !inputStory) return;
 
-      // Sécurité : si on n'a pas le conteneur hidden, on bloque
-      if (!storiesHidden) {
-        e.preventDefault();
-        alert("Erreur : conteneur des user stories introuvable.");
-        return;
-      }
+      // Si une US est encore dans le champ, on l'ajoute avant envoi
+      if (inputStory.value.trim()) addStoryFromInput();
 
-      // Recrée un input hidden par US (name = userStories)
+      // Recrée un input hidden par US
       storiesHidden.innerHTML = "";
       stories.forEach((text) => {
         const inp = document.createElement("input");
@@ -192,7 +194,7 @@ document.addEventListener("DOMContentLoaded", () => {
         storiesHidden.appendChild(inp);
       });
 
-      // Validation : au moins une US
+      // Validation : au moins une user story
       if (stories.length === 0) {
         e.preventDefault();
         alert("Ajoute au moins une user story avant de créer la session.");

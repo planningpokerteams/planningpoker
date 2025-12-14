@@ -1,22 +1,50 @@
-// static/scripts/vote-utils.js
-
 /**
+ * @fileoverview
  * vote-utils.js — Fonctions utilitaires (calculs Planning Poker)
  * --------------------------------------------------------------
- * Ce fichier est utilisé :
+ * Utilisé :
  * - côté navigateur (via <script>)
  * - côté tests Jest (via require / CommonJS)
  *
- * IMPORTANT :
- * - On exporte en CommonJS si `module.exports` existe (tests)
- * - Sinon, on expose sur `window.VoteUtils` (navigateur)
+ * Objectif : fonctions "pures" (pas de DOM), testables facilement.
  */
+
+/* ========================================================================== */
+/* 1) Constantes                                                              */
+/* ========================================================================== */
 
 /**
  * Deck Fibonacci simplifié (cartes disponibles).
  * @type {number[]}
  */
 const PLANNING_DECK = [1, 2, 3, 5, 8, 13];
+
+/* ========================================================================== */
+/* 2) Types (JSDoc)                                                           */
+/* ========================================================================== */
+
+/**
+ * Résultat de calcul pour la moyenne.
+ * @typedef {Object} AverageResult
+ * @property {number} avg  - Moyenne brute
+ * @property {number} card - Carte du deck la plus proche
+ */
+
+/**
+ * Résultat de calcul pour la médiane.
+ * @typedef {Object} MedianResult
+ * @property {number} median - Médiane brute
+ * @property {number} card   - Carte du deck la plus proche
+ */
+
+/**
+ * Dictionnaire d'occurrences (ex: {"3": 2, "5": 1}).
+ * @typedef {Object.<string, number>} VoteCounts
+ */
+
+/* ========================================================================== */
+/* 3) Fonctions                                                               */
+/* ========================================================================== */
 
 /**
  * Retourne la carte du deck la plus proche d’une valeur.
@@ -39,12 +67,6 @@ function nearestCard(value) {
 }
 
 /**
- * @typedef {Object} AverageResult
- * @property {number} avg  - Moyenne brute
- * @property {number} card - Carte du deck la plus proche
- */
-
-/**
  * Calcule la moyenne et renvoie la carte la plus proche.
  * @param {number[]} votes
  * @returns {AverageResult}
@@ -54,12 +76,6 @@ function computeAverage(votes) {
   const avg = sum / votes.length;
   return { avg, card: nearestCard(avg) };
 }
-
-/**
- * @typedef {Object} MedianResult
- * @property {number} median - Médiane brute
- * @property {number} card   - Carte du deck la plus proche
- */
 
 /**
  * Calcule la médiane et renvoie la carte la plus proche.
@@ -82,20 +98,22 @@ function computeMedian(votes) {
 /**
  * Compte les occurrences de chaque valeur.
  * @param {number[]} votes
- * @returns {Record<string, number>}
+ * @returns {VoteCounts}
  */
 function computeCounts(votes) {
-  /** @type {Record<string, number>} */
+  /** @type {VoteCounts} */
   const counts = {};
+
   votes.forEach((v) => {
-    counts[v] = (counts[v] || 0) + 1;
+    counts[String(v)] = (counts[String(v)] || 0) + 1;
   });
+
   return counts;
 }
 
-/* -------------------------------------------------------------------------- */
-/* Exports                                                                     */
-/* -------------------------------------------------------------------------- */
+/* ========================================================================== */
+/* 4) Exports                                                                 */
+/* ========================================================================== */
 
 const api = {
   PLANNING_DECK,
@@ -110,7 +128,7 @@ if (typeof module !== "undefined" && module.exports) {
   module.exports = api;
 }
 
-// Browser global (optionnel, pratique si tu veux t'en servir ailleurs)
+// Browser global (optionnel)
 if (typeof window !== "undefined") {
   window.VoteUtils = api;
 }

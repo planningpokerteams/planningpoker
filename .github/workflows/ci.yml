@@ -2,85 +2,84 @@ name: CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: ["**"]
   pull_request:
-    branches: [ main, develop ]
+
+# Evite d'empiler 10 runs si tu push plusieurs fois
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
-  tests:
+  backend:
+    name: Backend (pytest)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      # =================================================
-      # BACKEND — Python / Flask / Firestore
-      # =================================================
-      - name: Set up Python
+      - name: Set up Python (with pip cache)
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: "requirements.txt"
 
-      - name: Install Python dependencies
+      - name: Recreate Firebase service account file
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          set -euo pipefail
+          if [ -z "${FIREBASE_SERVICE_ACCOUNT_JSON:-}" ]; then
+            echo "Missing secret: FIREBASE_SERVICE_ACCOUNT_JSON"
+            exit 1
+          fi
+
+          # Fichier attendu par ton app.py (même nom qu’en local)
+          FILE="pokerplanning-749a9-firebase-adminsdk-fbsvc-10f7d5cc49.json"
+
+          umask 077
+          printf "%s" "$FIREBASE_SERVICE_ACCOUNT_JSON" > "$FILE"
+
+          # Expose le chemin pour app.py
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$PWD/$FILE" >> "$GITHUB_ENV"
+
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Recreate Firebase service account file
+      - name: Run tests
         env:
-          FIREBASE_SERVICE_ACCOUNT_B64: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_B64 }}
-        run: |
-          if [ -z "$FIREBASE_SERVICE_ACCOUNT_B64" ]; then
-            echo "Missing FIREBASE_SERVICE_ACCOUNT_B64 secret"
-            exit 1
-          fi
-
-          echo "$FIREBASE_SERVICE_ACCOUNT_B64" | base64 -d > service-account.json
-          python -c "import json; json.load(open('service-account.json')); print('Firebase JSON OK')"
-          echo "GOOGLE_APPLICATION_CREDENTIALS=$PWD/service-account.json" >> $GITHUB_ENV
-
-      - name: Run backend tests (pytest)
-        env:
-          PYTHONPATH: ${{ github.workspace }}
+          # utile si tu veux que certains libs se mettent en mode CI
+          CI: "true"
         run: pytest -q
 
-      # =================================================
-      # FRONTEND — Node / Jest
-      # =================================================
-      - name: Set up Node
+  frontend:
+    name: Frontend (jest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node (with npm cache)
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+          cache: "npm"
+          cache-dependency-path: "package-lock.json"
 
-      - name: Configure npm registry (public)
-        run: npm config set registry https://registry.npmjs.org/
-
-      - name: Install frontend dependencies
+      - name: Install dependencies
         run: npm ci
 
-      - name: Run frontend tests (Jest)
-        run: npm test
-
-      # =================================================
-      # DOCUMENTATION — Doxygen + JSDoc (artefact)
-      # =================================================
-      - name: Install Doxygen
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y doxygen graphviz
-
-      - name: Build documentation output folder
-        run: mkdir -p site
-
-      - name: Build Doxygen docs
-        run: doxygen docs/doxygen/Doxyfile
-
-      - name: Build JSDoc docs
-        run: npx jsdoc -c docs/jsdoc/jsdoc.json
-
-      - name: Upload documentation artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: documentation
-          path: site/
+      - name: Run tests
+        env:
+          CI: "true"
+        run: npm test -- --ci
