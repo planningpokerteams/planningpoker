@@ -33,24 +33,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 📁 Prépare la structure du site publié (Doxygen à la racine)
       - name: Prepare site folder
         run: |
           set -e
           rm -rf site
           mkdir -p site
 
-      # ---------- Doxygen ----------
       - name: Install Doxygen
         run: |
           sudo apt-get update
           sudo apt-get install -y doxygen graphviz
 
-      - name: Generate Doxygen (publish as root)
+      - name: Generate Doxygen (root index.html)
         run: |
           set -e
 
-          # ✅ Priorité : Doxyfile à la racine
           if [ -f Doxyfile ]; then
             DOXYFILE_PATH="Doxyfile"
           elif [ -f docs/doxygen/Doxyfile ]; then
@@ -60,29 +57,23 @@ jobs:
             exit 1
           fi
 
-          # Génère dans site/ (OUTPUT_DIRECTORY)
+          # ⚡ Doxygen génère directement dans "site/" (donc site/index.html)
           ( cat "$DOXYFILE_PATH"; \
             echo ""; \
             echo "OUTPUT_DIRECTORY=site"; \
+            echo "HTML_OUTPUT=."; \
             echo "GENERATE_HTML=YES"; \
             echo "GENERATE_LATEX=NO"; \
           ) | doxygen -
 
-          # Vérification Doxygen
-          if [ ! -f site/html/index.html ]; then
-            echo "❌ Doxygen index not found at site/html/index.html"
+          # Vérif
+          if [ ! -f site/index.html ]; then
+            echo "❌ Doxygen index not found at site/index.html"
+            echo "Content of site/:"
+            ls -la site || true
             exit 1
           fi
 
-          # 🔥 Publier Doxygen directement à la racine de Pages
-          # GitHub Pages sert /index.html à la racine, donc on veut site/index.html
-          rm -f site/index.html || true
-          cp -R site/html/* site/
-
-          # Nettoyage : on évite d’avoir /html/ en plus
-          rm -rf site/html
-
-      # ---------- Upload Pages artifact ----------
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
