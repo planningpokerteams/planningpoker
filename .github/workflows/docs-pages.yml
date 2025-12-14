@@ -1,61 +1,165 @@
-name: Deploy Docs (Pages)
+name: Docs (GitHub Pages)
 
 on:
   push:
-    branches: ["main"]
+    branches: [ main ]
+    # Optionnel : évite de rebuild si tu changes que du code non doc
     paths:
       - "docs/**"
-      - "README.md"
-      - "mkdocs.yml"
+      - "scripts/**"
+      - "**/*.js"
+      - "**/*.py"
+      - "app.py"
+      - "package.json"
+      - "package-lock.json"
       - ".github/workflows/docs-pages.yml"
-
-concurrency:
-  group: pages
-  cancel-in-progress: true
+  workflow_dispatch:
 
 permissions:
   contents: read
   pages: write
   id-token: write
 
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
+      # 📁 Prépare la structure du site publié
+      - name: Prepare site folder
+        run: |
+          set -e
+          rm -rf site
+          mkdir -p site/doxygen
+          mkdir -p site/jsdoc
+
+      # ---------- Node (JSDoc) ----------
+      - name: Set up Node (with npm cache)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: "package-lock.json"
+
+      - name: Configure npm registry (public)
+        run: npm config set registry https://registry.npmjs.org/
+
+      - name: Install JS deps
+        run: npm ci
+
+      # ---------- Doxygen ----------
+      - name: Install Doxygen
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y doxygen graphviz
+
+      # Génère Doxygen en forçant le dossier de sortie dans /site
+      # -> on ne dépend pas d'un OUTPUT_DIRECTORY externe
+      - name: Generate Doxygen (backend)
+        run: |
+          set -e
+
+          if [ ! -f docs/doxygen/Doxyfile ]; then
+            echo "❌ Missing docs/doxygen/Doxyfile"
+            exit 1
+          fi
+
+          # On injecte seulement la sortie, sans toucher à ton Doxyfile
+          # (override via stdin)
+          ( cat docs/doxygen/Doxyfile; \
+            echo ""; \
+            echo "OUTPUT_DIRECTORY=site/doxygen"; \
+            echo "GENERATE_HTML=YES"; \
+            echo "GENERATE_LATEX=NO"; \
+          ) | doxygen -
+
+          # Vérification
+          if [ ! -f site/doxygen/html/index.html ]; then
+            echo "❌ Doxygen index not found at site/doxygen/html/index.html"
+            echo "➡️ Vérifie que ton Doxyfile ne désactive pas GENERATE_HTML"
+            exit 1
+          fi
+
+      # ---------- JSDoc ----------
+      - name: Generate JSDoc (frontend)
+        run: |
+          set -e
+
+          if [ ! -f docs/jsdoc/jsdoc.json ]; then
+            echo "❌ Missing docs/jsdoc/jsdoc.json"
+            exit 1
+          fi
+
+          # Force la destination dans site/jsdoc
+          npx jsdoc -c docs/jsdoc/jsdoc.json -d site/jsdoc
+
+          if [ ! -f site/jsdoc/index.html ]; then
+            echo "❌ JSDoc index not found at site/jsdoc/index.html"
+            exit 1
+          fi
+
+      # ---------- Homepage unifiée ----------
+      - name: Create docs homepage
+        run: |
+          cat > site/index.html <<'HTML'
+          <!doctype html>
+          <html lang="fr">
+          <head>
+            <meta charset="utf-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1" />
+            <title>Planning Poker — Documentation</title>
+            <style>
+              body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:880px;margin:40px auto;padding:0 16px;line-height:1.4}
+              .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-top:20px}
+              .card{border:1px solid #3333;border-radius:14px;padding:16px}
+              a{color:inherit}
+              h1{margin:0 0 6px}
+              p{opacity:.85}
+              code{background:#00000010;padding:2px 6px;border-radius:6px}
+            </style>
+          </head>
+          <body>
+            <h1>Planning Poker — Documentation</h1>
+            <p>Choisis la doc que tu veux consulter :</p>
+            <div class="cards">
+              <div class="card">
+                <h2>Doxygen (Backend)</h2>
+                <p>Doc auto de <code>app.py</code> (Python + structure projet).</p>
+                <p><a href="./doxygen/html/index.html">➡️ Ouvrir Doxygen</a></p>
+              </div>
+              <div class="card">
+                <h2>JSDoc (Frontend)</h2>
+                <p>Doc auto des fichiers JavaScript.</p>
+                <p><a href="./jsdoc/index.html">➡️ Ouvrir JSDoc</a></p>
+              </div>
+            </div>
+          </body>
+          </html>
+          HTML
+
+      # ---------- Upload Pages artifact ----------
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
-      # Exemple MkDocs (le plus fréquent)
-      - name: Set up Python (cache pip)
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: "pip"
-
-      - name: Install docs deps
-        run: |
-          python -m pip install --upgrade pip
-          pip install mkdocs mkdocs-material
-
-      - name: Build docs
-        run: mkdocs build --site-dir site
-
-      - name: Upload artifact
+      - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: site
 
   deploy:
-    needs: build
     runs-on: ubuntu-latest
+    needs: build
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-
     steps:
       - name: Deploy to GitHub Pages
         id: deployment

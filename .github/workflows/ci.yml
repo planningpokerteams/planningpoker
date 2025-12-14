@@ -5,7 +5,7 @@ on:
     branches: ["**"]
   pull_request:
 
-# Évite d'empiler 10 runs si tu push plusieurs fois
+# Évite d'empiler plusieurs runs si tu push plusieurs fois
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -37,24 +37,25 @@ jobs:
           set -euo pipefail
 
           if [ -z "${FIREBASE_SERVICE_ACCOUNT_B64:-}" ]; then
-            echo "Missing secret: FIREBASE_SERVICE_ACCOUNT_B64"
+            echo "❌ Missing secret: FIREBASE_SERVICE_ACCOUNT_B64"
             exit 1
           fi
 
-          # Nom EXACT du fichier attendu par Firebase / ton app
+          # Nom EXACT du fichier attendu par Firebase / app.py
           FILE="pokerplanning-749a9-firebase-adminsdk-fbsvc-10f7d5cc49.json"
 
           umask 077
           echo "$FIREBASE_SERVICE_ACCOUNT_B64" | base64 -d > "$FILE"
 
-          # Vérification rapide que le JSON est valide
-          python - << 'EOF'
+          # Vérification que le JSON est bien valide
+          python - <<'PY'
           import json
-          json.load(open("pokerplanning-749a9-firebase-adminsdk-fbsvc-10f7d5cc49.json"))
-          print("Firebase JSON OK")
-          EOF
+          with open("pokerplanning-749a9-firebase-adminsdk-fbsvc-10f7d5cc49.json", "r", encoding="utf-8") as f:
+              json.load(f)
+          print("✅ Firebase JSON OK")
+          PY
 
-          # Variable standard Google
+          # Variable standard utilisée par Firebase / Google SDK
           echo "GOOGLE_APPLICATION_CREDENTIALS=$PWD/$FILE" >> "$GITHUB_ENV"
 
       - name: Install dependencies
