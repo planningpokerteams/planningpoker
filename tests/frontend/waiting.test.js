@@ -1,16 +1,25 @@
-// tests/frontend/waiting.test.js
+/**
+ * @file tests/frontend/waiting.test.js
+ * @description
+ * Test DOM (JSDOM) du script waiting.js :
+ * - waiting.js doit lire le sessionId depuis l'attribut data-session-id
+ * - puis appeler l'API /api/participants/<sessionId> pour récupérer les joueurs
+ *
+ * Ce test se concentre sur :
+ * - l'appel fetch avec la bonne URL
+ */
 
 const { JSDOM } = require("jsdom");
 const fs = require("fs");
 const path = require("path");
 
-const scriptPath = path.join(
-  process.cwd(),
-  "static",
-  "scripts",
-  "waiting.js" // adapte si ton fichier est ailleurs
-);
+/** Chemin vers le script waiting côté client */
+const scriptPath = path.join(process.cwd(), "static", "scripts", "waiting.js"); // adapte si besoin
 
+/**
+ * Crée un DOM minimal pour la page waiting et injecte waiting.js.
+ * @returns {{ dom: JSDOM, fetchMock: jest.Mock }}
+ */
 function setupWaitingDom() {
   const html = `
     <main class="hero" data-session-id="ABC123">
@@ -18,12 +27,17 @@ function setupWaitingDom() {
       <ul id="participants-list"></ul>
     </main>
   `;
+
   const dom = new JSDOM(html, { runScripts: "outside-only" });
 
   global.window = dom.window;
   global.document = dom.window.document;
 
-  // Mock fetch AVANT de charger waiting.js
+  /**
+   * Mock fetch : on renvoie une réponse de participants minimale.
+   * Le contenu n'est pas l'objet du test ici, mais on doit renvoyer
+   * une structure attendue pour que waiting.js ne plante pas.
+   */
   global.fetch = dom.window.fetch = jest.fn(() =>
     Promise.resolve({
       json: async () => ({
@@ -36,10 +50,11 @@ function setupWaitingDom() {
     })
   );
 
+  // Injecte waiting.js
   const code = fs.readFileSync(scriptPath, "utf8");
   dom.window.eval(code);
 
-  // Déclenche DOMContentLoaded pour exécuter le code de waiting.js
+  // Déclenche DOMContentLoaded si waiting.js s'y accroche
   dom.window.document.dispatchEvent(
     new dom.window.Event("DOMContentLoaded", {
       bubbles: true,
@@ -50,11 +65,11 @@ function setupWaitingDom() {
   return { dom, fetchMock: global.fetch };
 }
 
-describe("waiting.js – rafraîchissement des participants", () => {
+describe("waiting.js — rafraîchissement des participants", () => {
   test("appelle l'API participants avec le bon sessionId", async () => {
     const { fetchMock } = setupWaitingDom();
 
-    // Laisser le temps à fetch().json() de se lancer
+    // Laisse le temps aux Promises (fetch().json()) de s'exécuter
     await Promise.resolve();
     await Promise.resolve();
 
