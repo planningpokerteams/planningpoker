@@ -5,7 +5,7 @@ on:
     branches: ["**"]
   pull_request:
 
-# Evite d'empiler 10 runs si tu push plusieurs fois
+# Évite d'empiler 10 runs si tu push plusieurs fois
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -30,23 +30,31 @@ jobs:
           cache: "pip"
           cache-dependency-path: "requirements.txt"
 
-      - name: Recreate Firebase service account file
+      - name: Recreate Firebase service account file (Base64)
         env:
-          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+          FIREBASE_SERVICE_ACCOUNT_B64: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_B64 }}
         run: |
           set -euo pipefail
-          if [ -z "${FIREBASE_SERVICE_ACCOUNT_JSON:-}" ]; then
-            echo "Missing secret: FIREBASE_SERVICE_ACCOUNT_JSON"
+
+          if [ -z "${FIREBASE_SERVICE_ACCOUNT_B64:-}" ]; then
+            echo "Missing secret: FIREBASE_SERVICE_ACCOUNT_B64"
             exit 1
           fi
 
-          # Fichier attendu par ton app.py (même nom qu’en local)
+          # Nom EXACT du fichier attendu par Firebase / ton app
           FILE="pokerplanning-749a9-firebase-adminsdk-fbsvc-10f7d5cc49.json"
 
           umask 077
-          printf "%s" "$FIREBASE_SERVICE_ACCOUNT_JSON" > "$FILE"
+          echo "$FIREBASE_SERVICE_ACCOUNT_B64" | base64 -d > "$FILE"
 
-          # Expose le chemin pour app.py
+          # Vérification rapide que le JSON est valide
+          python - << 'EOF'
+          import json
+          json.load(open("pokerplanning-749a9-firebase-adminsdk-fbsvc-10f7d5cc49.json"))
+          print("Firebase JSON OK")
+          EOF
+
+          # Variable standard Google
           echo "GOOGLE_APPLICATION_CREDENTIALS=$PWD/$FILE" >> "$GITHUB_ENV"
 
       - name: Install dependencies
@@ -56,7 +64,6 @@ jobs:
 
       - name: Run tests
         env:
-          # utile si tu veux que certains libs se mettent en mode CI
           CI: "true"
         run: pytest -q
 
