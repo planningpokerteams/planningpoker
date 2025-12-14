@@ -55,6 +55,11 @@ document.addEventListener("DOMContentLoaded", () => {
    * donc ici on met directement le texte dans l'élément.
    * @returns {void}
    */
+/**
+ * @brief Fonction `startWaitingTimer`.
+ *
+ * @returns {*} 
+ */
   function startWaitingTimer() {
     /** @type {HTMLElement|null} */
     const timerEl = document.getElementById("waiting-timer");
@@ -84,6 +89,11 @@ document.addEventListener("DOMContentLoaded", () => {
    * Cherche le conteneur de liste participants.
    * @returns {HTMLElement|null}
    */
+/**
+ * @brief Fonction `getParticipantsListEl`.
+ *
+ * @returns {*} 
+ */
   function getParticipantsListEl() {
     return (
       document.getElementById("participants-list") ||
@@ -97,6 +107,11 @@ document.addEventListener("DOMContentLoaded", () => {
    * @param {string} seed
    * @returns {string}
    */
+/**
+ * @brief Fonction `dicebearUrl`.
+ * @param {*} seed
+ * @returns {*} 
+ */
   function dicebearUrl(seed) {
     const safeSeed = encodeURIComponent(seed || "astronaut");
     return `https://api.dicebear.com/9.x/avataaars/svg?seed=${safeSeed}&backgroundColor=b6e3f4&radius=50`;
@@ -107,6 +122,11 @@ document.addEventListener("DOMContentLoaded", () => {
    * @param {ParticipantsResponse} data
    * @returns {void}
    */
+/**
+ * @brief Fonction `renderParticipants`.
+ * @param {*} data
+ * @returns {*} 
+ */
   function renderParticipants(data) {
     const listEl = getParticipantsListEl();
     if (!listEl) return;
@@ -139,6 +159,11 @@ document.addEventListener("DOMContentLoaded", () => {
    * @param {ParticipantsResponse} data
    * @returns {void}
    */
+/**
+ * @brief Fonction `maybeRedirectToVote`.
+ * @param {*} data
+ * @returns {*} 
+ */
   function maybeRedirectToVote(data) {
     const status = data && data.status ? String(data.status) : "waiting";
     if (status === "started") {
@@ -161,6 +186,11 @@ document.addEventListener("DOMContentLoaded", () => {
    * Poll /api/participants/<sessionId> et met à jour l'UI.
    * @returns {void}
    */
+/**
+ * @brief Fonction `refreshParticipants`.
+ *
+ * @returns {*} 
+ */
   function refreshParticipants() {
     fetch(`/api/participants/${sessionId}`, { cache: "no-store" })
       .then((r) => r.json())

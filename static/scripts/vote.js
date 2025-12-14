@@ -158,6 +158,11 @@ let timeExpiredHandled = false;
  * @param {boolean} enabled
  * @returns {void}
  */
+/**
+ * @brief Fonction `setCardsEnabled`.
+ * @param {*} enabled
+ * @returns {*} 
+ */
 function setCardsEnabled(enabled) {
   cards.forEach((card) => {
     card.disabled = !enabled;
@@ -168,6 +173,11 @@ function setCardsEnabled(enabled) {
 /**
  * Place les sièges joueurs (.player-seat) en cercle autour de la table.
  * @returns {void}
+ */
+/**
+ * @brief Fonction `layoutSeats`.
+ *
+ * @returns {*} 
  */
 function layoutSeats() {
   if (!pokerTable) return;
@@ -224,6 +234,11 @@ const PLANNING_DECK = [1, 2, 3, 5, 8, 13];
  * @param {number} value
  * @returns {number}
  */
+/**
+ * @brief Fonction `nearestCard`.
+ * @param {*} value
+ * @returns {*} 
+ */
 function nearestCard(value) {
   let best = PLANNING_DECK[0];
   let bestDiff = Math.abs(value - best);
@@ -249,6 +264,11 @@ function nearestCard(value) {
  * @param {number[]} votes
  * @returns {AverageResult}
  */
+/**
+ * @brief Fonction `computeAverage`.
+ * @param {*} votes
+ * @returns {*} 
+ */
 function computeAverage(votes) {
   const sum = votes.reduce((a, b) => a + b, 0);
   const avg = sum / votes.length;
@@ -264,6 +284,11 @@ function computeAverage(votes) {
 /**
  * @param {number[]} votes
  * @returns {MedianResult}
+ */
+/**
+ * @brief Fonction `computeMedian`.
+ * @param {*} votes
+ * @returns {*} 
  */
 function computeMedian(votes) {
   const sorted = [...votes].sort((a, b) => a - b);
@@ -286,6 +311,11 @@ function computeMedian(votes) {
  * @param {number[]} votes
  * @returns {VoteCounts}
  */
+/**
+ * @brief Fonction `computeCounts`.
+ * @param {*} votes
+ * @returns {*} 
+ */
 function computeCounts(votes) {
   /** @type {VoteCounts} */
   const counts = {};
@@ -305,6 +335,11 @@ function computeCounts(votes) {
  * @param {GameState} data
  * @returns {void}
  */
+/**
+ * @brief Fonction `updateTimerFromData`.
+ * @param {*} data
+ * @returns {*} 
+ */
 function updateTimerFromData(data) {
   timerPerStorySeconds = (data.timePerStory || 0) * 60;
 
@@ -318,6 +353,11 @@ function updateTimerFromData(data) {
 /**
  * Tick timer visuel + auto-next story (orga).
  * @returns {void}
+ */
+/**
+ * @brief Fonction `tickStoryTimer`.
+ *
+ * @returns {*} 
  */
 function tickStoryTimer() {
   if (!storyTimerEl) return;
@@ -365,6 +405,12 @@ setInterval(tickStoryTimer, 1000);
  * @param {boolean} withBg
  * @returns {string}
  */
+/**
+ * @brief Fonction `dicebearUrl`.
+ * @param {*} seed
+ * @param {*} withBg
+ * @returns {*} 
+ */
 function dicebearUrl(seed, withBg) {
   const s = encodeURIComponent(seed || "astronaut");
   const bg = withBg ? "&backgroundColor=b6e3f4&radius=50" : "";
@@ -376,6 +422,11 @@ function dicebearUrl(seed, withBg) {
  * @param {string} s
  * @returns {string}
  */
+/**
+ * @brief Fonction `escapeHtml`.
+ * @param {*} s
+ * @returns {*} 
+ */
 function escapeHtml(s) {
   if (!s) return "";
   return String(s).replace(/[&<>\"']/g, (c) => {
@@ -386,6 +437,11 @@ function escapeHtml(s) {
 /**
  * Appelle /api/game/<sessionId> et met à jour l’UI.
  * @returns {void}
+ */
+/**
+ * @brief Fonction `refreshGameState`.
+ *
+ * @returns {*} 
  */
 function refreshGameState() {
   if (!sessionId) return;
@@ -748,6 +804,11 @@ window.addEventListener("resize", layoutSeats);
  * @param {ChatMessage[]} msgs
  * @returns {void}
  */
+/**
+ * @brief Fonction `renderChatMessages`.
+ * @param {*} msgs
+ * @returns {*} 
+ */
 function renderChatMessages(msgs) {
   if (!chatMessages) return;
 
@@ -769,6 +830,11 @@ let lastChatFetch = 0;
 /**
  * Fetch chat si panneau visible (throttle 1 req/sec).
  * @returns {void}
+ */
+/**
+ * @brief Fonction `fetchChat`.
+ *
+ * @returns {*} 
  */
 function fetchChat() {
   if (!sessionId) return;
@@ -793,6 +859,11 @@ setInterval(fetchChat, 2000);
  * Envoie un message dans le chat.
  * @param {string} text
  * @returns {Promise<void>}
+ */
+/**
+ * @brief Fonction `sendChatMessage`.
+ * @param {*} text
+ * @returns {*} 
  */
 function sendChatMessage(text) {
   if (!sessionId) return Promise.resolve();

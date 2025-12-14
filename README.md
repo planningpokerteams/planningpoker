@@ -132,8 +132,6 @@ npm test -- --runInBand
 📦docs
  ┣ 📂doxygen
  ┃ ┗ 📜Doxyfile
- ┗ 📂jsdoc
- ┃ ┗ 📜jsdoc.json
 📦asset
 📦static
  ┣ 📂scripts

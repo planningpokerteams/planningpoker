@@ -51,6 +51,11 @@ const PLANNING_DECK = [1, 2, 3, 5, 8, 13];
  * @param {number} value
  * @returns {number}
  */
+/**
+ * @brief Fonction `nearestCard`.
+ * @param {*} value
+ * @returns {*} 
+ */
 function nearestCard(value) {
   let best = PLANNING_DECK[0];
   let bestDiff = Math.abs(value - best);
@@ -71,6 +76,11 @@ function nearestCard(value) {
  * @param {number[]} votes
  * @returns {AverageResult}
  */
+/**
+ * @brief Fonction `computeAverage`.
+ * @param {*} votes
+ * @returns {*} 
+ */
 function computeAverage(votes) {
   const sum = votes.reduce((a, b) => a + b, 0);
   const avg = sum / votes.length;
@@ -81,6 +91,11 @@ function computeAverage(votes) {
  * Calcule la médiane et renvoie la carte la plus proche.
  * @param {number[]} votes
  * @returns {MedianResult}
+ */
+/**
+ * @brief Fonction `computeMedian`.
+ * @param {*} votes
+ * @returns {*} 
  */
 function computeMedian(votes) {
   const sorted = [...votes].sort((a, b) => a - b);
@@ -99,6 +114,11 @@ function computeMedian(votes) {
  * Compte les occurrences de chaque valeur.
  * @param {number[]} votes
  * @returns {VoteCounts}
+ */
+/**
+ * @brief Fonction `computeCounts`.
+ * @param {*} votes
+ * @returns {*} 
  */
 function computeCounts(votes) {
   /** @type {VoteCounts} */

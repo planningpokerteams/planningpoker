@@ -1,40 +1,119 @@
-# Doxyfile - Configuration Doxygen pour Planning Poker
 
+# --- Projet ---
 PROJECT_NAME           = "Planning Poker"
-PROJECT_BRIEF          = "Application de poker planning en ligne"
+PROJECT_BRIEF          = "Application de planning poker en ligne (Flask + Firestore + JS)"
 PROJECT_NUMBER         = "1.0"
 
-# Sortie dans un dossier unique pour fusion Doxygen + JSDoc
+# --- Sortie GitHub Pages ---
+# (Ton workflow peut override OUTPUT_DIRECTORY; ici on met la valeur par défaut)
 OUTPUT_DIRECTORY       = site/doxygen
-CREATE_SUBDIRS         = YES
-
-# Output
+CREATE_SUBDIRS         = NO
 GENERATE_HTML          = YES
 GENERATE_LATEX         = NO
-QUIET                  = YES
 
-# Extraction
-EXTRACT_ALL            = YES
-EXTRACT_PRIVATE        = YES
-EXTRACT_STATIC         = YES
-EXTRACT_LOCAL_CLASSES  = YES
+# --- UX / HTML ---
+GENERATE_TREEVIEW      = YES
+SEARCHENGINE           = YES
+FULL_SIDEBAR           = YES
+HTML_DYNAMIC_MENUS     = YES
+DISABLE_INDEX          = NO
+HTML_COLORSTYLE        = AUTO
+HTML_TIMESTAMP         = YES
 
-# Inputs : backend + templates + scripts front
-INPUT                  = app.py \
+# --- Encoding / Lang ---
+INPUT_ENCODING         = UTF-8
+OUTPUT_LANGUAGE        = French
+
+# --- Markdown / Main page ---
+MARKDOWN_SUPPORT       = YES
+AUTOLINK_SUPPORT       = YES
+BUILTIN_STL_SUPPORT    = YES
+USE_MDFILE_AS_MAINPAGE = README.md
+
+# --- Source browser (utile pour naviguer le code) ---
+SOURCE_BROWSER         = YES
+INLINE_SOURCES         = NO
+STRIP_CODE_COMMENTS    = NO
+
+# Nettoie les chemins affichés dans la doc
+STRIP_FROM_PATH        = .
+
+# --- Inputs ---
+# README + backend + scripts + docs Markdown + tests (si tu veux les documenter)
+INPUT                  = README.md \
+                         app.py \
                          templates \
-                         static/scripts \
-                         tests/backend
+                         static \
+                         tests \
+                         docs
 
 FILE_PATTERNS          = *.py \
                          *.js \
-                         *.html
+                         *.md \
+                         *.html \
+                         *.css
 
 RECURSIVE              = YES
 
-# Exclusions
+# --- Extensions / Parsing ---
+# Aide Doxygen à mieux reconnaître les langages (surtout Python/JS)
+EXTENSION_MAPPING      = py=Python \
+                         js=JavaScript \
+                         html=HTML \
+                         css=CSS \
+                         md=Markdown
+
+# --- Exclusions ---
 EXCLUDE_PATTERNS       = */node_modules/* \
                          */.git/* \
                          */.venv/* \
                          */venv/* \
                          */__pycache__/* \
-                         */site/*
+                         */site/* \
+                         */dist/* \
+                         */build/*
+
+# Si tu veux garder uniquement le code utile (pas le HTML template), décommente :
+# EXCLUDE_PATTERNS      += */templates/*
+
+# --- Extraction : doc propre (pas un dump) ---
+EXTRACT_ALL            = NO
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = YES
+EXTRACT_LOCAL_CLASSES  = YES
+
+HIDE_UNDOC_MEMBERS     = YES
+HIDE_UNDOC_CLASSES     = YES
+
+# Affiche quand même les fichiers non documentés dans l’arborescence (mais cache leurs membres)
+SHOW_FILES             = YES
+
+# --- Qualité / Warnings ---
+QUIET                  = YES
+WARNINGS               = YES
+WARN_IF_UNDOCUMENTED   = YES
+WARN_IF_DOC_ERROR      = YES
+WARN_NO_PARAMDOC       = NO
+
+# --- Relations utiles ---
+REFERENCED_BY_RELATION = YES
+REFERENCES_RELATION    = YES
+
+# --- Graphviz (nécessite graphviz dans le CI : apt-get install graphviz) ---
+HAVE_DOT               = YES
+DOT_GRAPH_MAX_NODES    = 50
+CALL_GRAPH             = YES
+CALLER_GRAPH           = YES
+CLASS_DIAGRAMS         = YES
+UML_LOOK               = YES
+
+# --- Tri / lisibilité ---
+SORT_MEMBER_DOCS       = YES
+SORT_BRIEF_DOCS        = YES
+SORT_GROUP_NAMES       = YES
+
+# --- Divers ---
+JAVADOC_AUTOBRIEF      = YES
+MULTILINE_CPP_IS_BRIEF = NO
+TAB_SIZE               = 4
+

@@ -79,6 +79,11 @@ document.addEventListener("DOMContentLoaded", () => {
    * Met à jour le paragraphe de description en fonction du mode choisi.
    * @returns {void}
    */
+/**
+ * @brief Fonction `updateModeDescription`.
+ *
+ * @returns {*} 
+ */
   function updateModeDescription() {
     if (!modeSelect || !modeDesc) return;
     const v = modeSelect.value || "strict";
@@ -98,6 +103,11 @@ document.addEventListener("DOMContentLoaded", () => {
    * Re-render la liste des user stories dans le DOM.
    * @returns {void}
    */
+/**
+ * @brief Fonction `renderStories`.
+ *
+ * @returns {*} 
+ */
   function renderStories() {
     if (!storiesListEl) return;
 
@@ -152,6 +162,11 @@ document.addEventListener("DOMContentLoaded", () => {
    * Ajoute le contenu du champ texte à la liste `stories`.
    * @returns {void}
    */
+/**
+ * @brief Fonction `addStoryFromInput`.
+ *
+ * @returns {*} 
+ */
   function addStoryFromInput() {
     if (!inputStory) return;
     const value = inputStory.value.trim();

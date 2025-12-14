@@ -1,3 +1,13 @@
+"""
+@file app.py
+@brief Backend Flask de Planning Poker (gestion sessions, votes, chat, export/import).
+@details
+- Rendu des pages HTML (create/join/waiting/vote)
+- API JSON de polling (participants, game state) et actions (resume, next_story, revote)
+- Export/Import d'état de partie
+- Persistance via Google Firestore
+"""
+
 from flask import (
     Flask, render_template, request, redirect,
     url_for, session, jsonify, send_from_directory, Response
@@ -193,6 +203,10 @@ def _reset_all_votes(session_ref) -> None:
 # =========================================================
 @app.route("/asset/<path:filename>")
 def asset_file(filename):
+    """
+    @brief Route `asset_file`.
+    @route /asset/<path:filename>
+    """
     return send_from_directory(ASSET_FOLDER, filename)
 
 
@@ -201,6 +215,10 @@ def asset_file(filename):
 # =========================================================
 @app.route("/")
 def index():
+    """
+    @brief Route `index`.
+    @route /
+    """
     return render_template("index.html")
 
 
@@ -209,6 +227,11 @@ def index():
 # =========================================================
 @app.route("/create", methods=["GET", "POST"])
 def create():
+    """
+    @brief Route `create`.
+    @route /create
+    @methods GET, POST
+    """
     if request.method == "POST":
         organizer = (request.form.get("organizer") or "").strip()
         user_stories = request.form.getlist("userStories")
@@ -299,6 +322,11 @@ def create():
 # =========================================================
 @app.route("/join", methods=["GET", "POST"])
 def join():
+    """
+    @brief Route `join`.
+    @route /join
+    @methods GET, POST
+    """
     if request.method == "POST":
         code = (request.form.get("code") or "").strip().upper()
         name = (request.form.get("name") or "").strip()
@@ -334,6 +362,10 @@ def join():
 # =========================================================
 @app.route("/waiting/<session_id>")
 def waiting(session_id):
+    """
+    @brief Route `waiting`.
+    @route /waiting/<session_id>
+    """
     session_ref, session_data = _get_session_or_404(session_id)
     if not session_data:
         return "Session introuvable", 404
@@ -351,6 +383,10 @@ def waiting(session_id):
 
 @app.route("/api/participants/<session_id>")
 def api_participants(session_id):
+    """
+    @brief Route `api_participants`.
+    @route /api/participants/<session_id>
+    """
     session_ref, session_data = _get_session_or_404(session_id)
     if not session_data:
         return jsonify({"error": "session_not_found"}), 404
@@ -367,6 +403,11 @@ def api_participants(session_id):
 # =========================================================
 @app.route("/start/<session_id>", methods=["POST"])
 def start(session_id):
+    """
+    @brief Route `start`.
+    @route /start/<session_id>
+    @methods POST
+    """
     session_ref, session_data = _get_session_or_404(session_id)
     if not session_data:
         return "Session introuvable", 404
@@ -394,6 +435,11 @@ def start(session_id):
 # =========================================================
 @app.route("/vote/<session_id>", methods=["GET", "POST"])
 def vote(session_id):
+    """
+    @brief Route `vote`.
+    @route /vote/<session_id>
+    @methods GET, POST
+    """
     session_ref, data = _get_session_or_404(session_id)
     if not data:
         return "Session introuvable", 404
@@ -461,6 +507,11 @@ def vote(session_id):
 # =========================================================
 @app.route("/reveal/<session_id>", methods=["POST"])
 def reveal(session_id):
+    """
+    @brief Route `reveal`.
+    @route /reveal/<session_id>
+    @methods POST
+    """
     session_ref, data = _get_session_or_404(session_id)
     if not data:
         return "Session introuvable", 404
@@ -481,6 +532,10 @@ def reveal(session_id):
 # =========================================================
 @app.route("/api/game/<session_id>")
 def api_game(session_id):
+    """
+    @brief Route `api_game`.
+    @route /api/game/<session_id>
+    """
     session_ref, data = _get_session_or_404(session_id)
     if not data:
         return jsonify({"error": "not_found"}), 404
@@ -566,6 +621,11 @@ def api_game(session_id):
 # =========================================================
 @app.route("/resume/<session_id>", methods=["POST"])
 def resume(session_id):
+    """
+    @brief Route `resume`.
+    @route /resume/<session_id>
+    @methods POST
+    """
     session_ref, data = _get_session_or_404(session_id)
     if not data:
         return jsonify({"error": "not_found"}), 404
@@ -599,6 +659,11 @@ def resume(session_id):
 # =========================================================
 @app.route("/next_story/<session_id>", methods=["POST"])
 def next_story(session_id):
+    """
+    @brief Route `next_story`.
+    @route /next_story/<session_id>
+    @methods POST
+    """
     session_ref, data = _get_session_or_404(session_id)
     if not data:
         return jsonify({"error": "not_found"}), 404
@@ -688,6 +753,11 @@ def next_story(session_id):
 # =========================================================
 @app.route("/revote/<session_id>", methods=["POST"])
 def revote(session_id):
+    """
+    @brief Route `revote`.
+    @route /revote/<session_id>
+    @methods POST
+    """
     session_ref, data = _get_session_or_404(session_id)
     if not data:
         return jsonify({"error": "not_found"}), 404
@@ -713,6 +783,11 @@ def revote(session_id):
 # =========================================================
 @app.route("/api/chat/<session_id>", methods=["GET", "POST"])
 def api_chat(session_id):
+    """
+    @brief Route `api_chat`.
+    @route /api/chat/<session_id>
+    @methods GET, POST
+    """
     session_ref, data = _get_session_or_404(session_id)
     if not data:
         return jsonify({"error": "not_found"}), 404
@@ -751,6 +826,10 @@ def api_chat(session_id):
 # =========================================================
 @app.route("/export_state/<session_id>")
 def export_state(session_id):
+    """
+    @brief Route `export_state`.
+    @route /export_state/<session_id>
+    """
     session_ref, data = _get_session_or_404(session_id)
     if not data:
         return "Session introuvable", 404
@@ -783,6 +862,10 @@ def export_state(session_id):
 
 @app.route("/download_results/<session_id>")
 def download_results(session_id):
+    """
+    @brief Route `download_results`.
+    @route /download_results/<session_id>
+    """
     session_ref, data = _get_session_or_404(session_id)
     if not data:
         return "Session introuvable", 404
