@@ -1,60 +1,28 @@
 /**
- * @fileoverview
- * vote-utils.js — Fonctions utilitaires (calculs Planning Poker)
- * --------------------------------------------------------------
- * Utilisé :
- * - côté navigateur (via <script>)
- * - côté tests Jest (via require / CommonJS)
+ * @file static/scripts/vote-utils.js
+ * @brief Fonctions utilitaires “pures” pour les calculs Planning Poker.
+ * @details
+ * Ce module est utilisé côté tests (Node/Jest) et peut servir côté client
+ * pour centraliser la logique de calcul :
+ * - nearestCard : carte Fibonacci la plus proche
+ * - computeAverage : moyenne et carte la plus proche
+ * - computeMedian : médiane et carte la plus proche
+ * - computeCounts : histogramme des votes
  *
- * Objectif : fonctions "pures" (pas de DOM), testables facilement.
+ * Remarque :
+ * Ici on exporte via module.exports (CommonJS) pour Jest.
  */
 
-/* ========================================================================== */
-/* 1) Constantes                                                              */
-/* ========================================================================== */
-
 /**
- * Deck Fibonacci simplifié (cartes disponibles).
+ * @brief Deck Planning Poker (Fibonacci simplifié).
  * @type {number[]}
  */
 const PLANNING_DECK = [1, 2, 3, 5, 8, 13];
 
-/* ========================================================================== */
-/* 2) Types (JSDoc)                                                           */
-/* ========================================================================== */
-
 /**
- * Résultat de calcul pour la moyenne.
- * @typedef {Object} AverageResult
- * @property {number} avg  - Moyenne brute
- * @property {number} card - Carte du deck la plus proche
- */
-
-/**
- * Résultat de calcul pour la médiane.
- * @typedef {Object} MedianResult
- * @property {number} median - Médiane brute
- * @property {number} card   - Carte du deck la plus proche
- */
-
-/**
- * Dictionnaire d'occurrences (ex: {"3": 2, "5": 1}).
- * @typedef {Object.<string, number>} VoteCounts
- */
-
-/* ========================================================================== */
-/* 3) Fonctions                                                               */
-/* ========================================================================== */
-
-/**
- * Retourne la carte du deck la plus proche d’une valeur.
- * @param {number} value
- * @returns {number}
- */
-/**
- * @brief Fonction `nearestCard`.
- * @param {*} value
- * @returns {*} 
+ * @brief Retourne la carte du deck la plus proche d’une valeur numérique.
+ * @param {number} value Valeur numérique (ex : moyenne/médiane).
+ * @returns {number} Carte du deck la plus proche.
  */
 function nearestCard(value) {
   let best = PLANNING_DECK[0];
@@ -72,14 +40,9 @@ function nearestCard(value) {
 }
 
 /**
- * Calcule la moyenne et renvoie la carte la plus proche.
- * @param {number[]} votes
- * @returns {AverageResult}
- */
-/**
- * @brief Fonction `computeAverage`.
- * @param {*} votes
- * @returns {*} 
+ * @brief Calcule la moyenne d’une liste de votes numériques.
+ * @param {number[]} votes Votes numériques.
+ * @returns {{avg:number, card:number}} Moyenne exacte + carte la plus proche.
  */
 function computeAverage(votes) {
   const sum = votes.reduce((a, b) => a + b, 0);
@@ -88,14 +51,9 @@ function computeAverage(votes) {
 }
 
 /**
- * Calcule la médiane et renvoie la carte la plus proche.
- * @param {number[]} votes
- * @returns {MedianResult}
- */
-/**
- * @brief Fonction `computeMedian`.
- * @param {*} votes
- * @returns {*} 
+ * @brief Calcule la médiane d’une liste de votes numériques.
+ * @param {number[]} votes Votes numériques.
+ * @returns {{median:number, card:number}} Médiane exacte + carte la plus proche.
  */
 function computeMedian(votes) {
   const sorted = [...votes].sort((a, b) => a - b);
@@ -111,44 +69,22 @@ function computeMedian(votes) {
 }
 
 /**
- * Compte les occurrences de chaque valeur.
- * @param {number[]} votes
- * @returns {VoteCounts}
- */
-/**
- * @brief Fonction `computeCounts`.
- * @param {*} votes
- * @returns {*} 
+ * @brief Construit un histogramme des occurrences de votes.
+ * @param {number[]} votes Votes numériques.
+ * @returns {Object<string, number>} Dictionnaire {valeur: occurrences}.
  */
 function computeCounts(votes) {
-  /** @type {VoteCounts} */
   const counts = {};
-
   votes.forEach((v) => {
-    counts[String(v)] = (counts[String(v)] || 0) + 1;
+    counts[v] = (counts[v] || 0) + 1;
   });
-
   return counts;
 }
 
-/* ========================================================================== */
-/* 4) Exports                                                                 */
-/* ========================================================================== */
-
-const api = {
+module.exports = {
   PLANNING_DECK,
   nearestCard,
   computeAverage,
   computeMedian,
   computeCounts,
 };
-
-// CommonJS (Jest / Node)
-if (typeof module !== "undefined" && module.exports) {
-  module.exports = api;
-}
-
-// Browser global (optionnel)
-if (typeof window !== "undefined") {
-  window.VoteUtils = api;
-}

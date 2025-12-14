@@ -1,208 +1,129 @@
 /**
- * @fileoverview
- * waiting.js — Salle d'attente (participants)
- * -------------------------------------------
- * Responsabilités :
- * - Lire le sessionId depuis <main class="hero" data-session-id="...">
- * - Poll /api/participants/<sessionId>
- * - Mettre à jour la liste des joueurs (avec avatars)
- * - Rediriger automatiquement vers /vote/<sessionId> quand status === "started"
- * - Démarrer un chrono d'attente (optionnel)
- */
-
-/* ========================================================================== */
-/* 1) Types (JSDoc)                                                           */
-/* ========================================================================== */
-
-/**
- * Un participant affichable dans la salle d'attente.
- * @typedef {Object} WaitingParticipant
- * @property {string} name - Nom/pseudo du participant
- * @property {string} [avatarSeed] - Seed DiceBear pour l'avatar
- */
-
-/**
- * Réponse API attendue depuis /api/participants/<sessionId>.
- * @typedef {Object} ParticipantsResponse
- * @property {WaitingParticipant[]} [participants] - Liste des participants
- * @property {string} [status] - waiting | started | paused | finished
- */
-
-/* ========================================================================== */
-/* 2) Bootstrap DOMContentLoaded                                               */
-/* ========================================================================== */
-
-document.addEventListener("DOMContentLoaded", () => {
-  /* ======================================================================== */
-  /* 2.1) Session                                                             */
-  /* ======================================================================== */
-
-  /** @type {HTMLElement|null} */
-  const mainEl = document.querySelector("main.hero[data-session-id]");
-
-  /** @type {string|null} */
-  const sessionId = mainEl ? mainEl.dataset.sessionId || null : null;
-
-  if (!sessionId) return;
-
-  /* ======================================================================== */
-  /* 2.2) Chrono d'attente (optionnel)                                         */
-  /* ======================================================================== */
-
-  /**
-   * Lance un chrono mm:ss si l'élément #waiting-timer existe.
-   * NOTE: ton HTML contient <div id="waiting-timer"> qui a déjà un <span>,
-   * donc ici on met directement le texte dans l'élément.
-   * @returns {void}
-   */
-/**
- * @brief Fonction `startWaitingTimer`.
+ * @file static/scripts/waiting.js
+ * @brief Script client de la salle d’attente.
+ * @details
+ * Fonctionnalités :
+ * - lit le sessionId depuis <main class="hero" data-session-id="...">
+ * - lance un chrono d’attente (temps écoulé) dans #waiting-timer
+ * - poll régulièrement /api/participants/<sessionId>
+ * - affiche la liste des participants (avatar + nom) dans #participants-list
+ * - redirige automatiquement vers /vote/<sessionId> quand status = "started"
  *
- * @returns {*} 
+ * Dépendances DOM attendues (waiting.html) :
+ * - main.hero[data-session-id]
+ * - #waiting-timer > span (optionnel)
+ * - #participants-list
  */
-  function startWaitingTimer() {
-    /** @type {HTMLElement|null} */
-    const timerEl = document.getElementById("waiting-timer");
-    if (!timerEl) return;
 
-    const start = Date.now();
+document.addEventListener('DOMContentLoaded', () => {
+    // ----------------------------------------------------------------
+    // Récupération du sessionId depuis data-session-id
+    // ----------------------------------------------------------------
+    const mainEl = document.querySelector('main.hero[data-session-id]');
+    const sessionId = mainEl ? mainEl.dataset.sessionId : null;
 
-    setInterval(() => {
-      const elapsedSec = Math.floor((Date.now() - start) / 1000);
-      const m = Math.floor(elapsedSec / 60);
-      const s = elapsedSec % 60;
+    // ----------------------------------------------------------------
+    // Chronomètre d'attente (temps écoulé)
+    // ----------------------------------------------------------------
 
-      timerEl.textContent = `⏱️ ${String(m).padStart(2, "0")}:${String(s).padStart(
-        2,
-        "0"
-      )}`;
-    }, 1000);
-  }
+    /**
+     * @brief Démarre un timer local (mm:ss) affiché dans #waiting-timer.
+     * @details
+     * Le chrono est purement côté client (pas synchronisé serveur),
+     * utile pour donner un feedback “vous êtes dans la salle depuis…”.
+     * @return {void}
+     */
+    (function startWaitingTimer() {
+        const timerEl = document.getElementById('waiting-timer');
+        if (!timerEl) return;
 
-  startWaitingTimer();
+        const span = timerEl.querySelector('span');
+        let elapsedSeconds = 0;
 
-  /* ======================================================================== */
-  /* 2.3) UI helpers                                                          */
-  /* ======================================================================== */
+        /**
+         * @brief Formate une durée en secondes vers "mm:ss".
+         * @param {number} totalSeconds Durée totale en secondes.
+         * @returns {string} Chaîne au format "mm:ss".
+         */
+        function formatTime(totalSeconds) {
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            return (
+                String(minutes).padStart(2, '0') +
+                ':' +
+                String(seconds).padStart(2, '0')
+            );
+        }
 
-  /**
-   * Cherche le conteneur de liste participants.
-   * @returns {HTMLElement|null}
-   */
-/**
- * @brief Fonction `getParticipantsListEl`.
- *
- * @returns {*} 
- */
-  function getParticipantsListEl() {
-    return (
-      document.getElementById("participants-list") ||
-      document.getElementById("players-list") ||
-      document.getElementById("participants")
-    );
-  }
+        // Affichage initial
+        span.textContent = formatTime(elapsedSeconds);
 
-  /**
-   * Construit l'URL DiceBear pour un seed donné.
-   * @param {string} seed
-   * @returns {string}
-   */
-/**
- * @brief Fonction `dicebearUrl`.
- * @param {*} seed
- * @returns {*} 
- */
-  function dicebearUrl(seed) {
-    const safeSeed = encodeURIComponent(seed || "astronaut");
-    return `https://api.dicebear.com/9.x/avataaars/svg?seed=${safeSeed}&backgroundColor=b6e3f4&radius=50`;
-  }
+        // Tick toutes les secondes
+        setInterval(() => {
+            elapsedSeconds++;
+            span.textContent = formatTime(elapsedSeconds);
+        }, 1000);
+    })();
 
-  /**
-   * Met à jour la liste des participants (avec avatars).
-   * @param {ParticipantsResponse} data
-   * @returns {void}
-   */
-/**
- * @brief Fonction `renderParticipants`.
- * @param {*} data
- * @returns {*} 
- */
-  function renderParticipants(data) {
-    const listEl = getParticipantsListEl();
-    if (!listEl) return;
+    // ----------------------------------------------------------------
+    // Poll participants + redirection au démarrage
+    // ----------------------------------------------------------------
 
-    const participants = data && Array.isArray(data.participants) ? data.participants : [];
+    /**
+     * @brief Récupère les participants via l’API et met à jour le DOM.
+     * @details
+     * Appelle GET /api/participants/<sessionId> et :
+     * - reconstruit #participants-list
+     * - redirige vers /vote/<sessionId> si la partie a démarré
+     * @return {void}
+     */
+    function refreshParticipants() {
+        if (!sessionId) return;
 
-    // Nettoyage
-    listEl.innerHTML = "";
+        fetch(`/api/participants/${sessionId}`)
+            .then(response => response.json())
+            .then(data => {
+                const ul = document.getElementById('participants-list');
+                if (!ul) return;
 
-    participants.forEach((p) => {
-      const li = document.createElement("li");
-      li.className = "participant-item";
+                ul.innerHTML = "";
 
-      const img = document.createElement("img");
-      img.className = "avatar-icon";
-      img.alt = `avatar ${p.name || ""}`;
-      img.src = dicebearUrl(p.avatarSeed || "astronaut");
+                (data.participants || []).forEach(p => {
+                    const li = document.createElement('li');
+                    li.className = 'participant-item';
 
-      const nameSpan = document.createElement("span");
-      nameSpan.textContent = p.name || "Joueur";
+                    const img = document.createElement('img');
+                    img.className = 'avatar-icon';
+                    img.src = `https://api.dicebear.com/9.x/avataaars/svg?seed=${
+                        encodeURIComponent(p.avatarSeed || 'astronaut')
+                    }&backgroundColor=b6e3f4&radius=50`;
+                    img.alt = `avatar ${p.name}`;
 
-      li.appendChild(img);
-      li.appendChild(nameSpan);
-      listEl.appendChild(li);
-    });
-  }
+                    const span = document.createElement('span');
+                    span.textContent = p.name;
 
-  /**
-   * Redirige vers la page de vote si la partie a démarré.
-   * @param {ParticipantsResponse} data
-   * @returns {void}
-   */
-/**
- * @brief Fonction `maybeRedirectToVote`.
- * @param {*} data
- * @returns {*} 
- */
-  function maybeRedirectToVote(data) {
-    const status = data && data.status ? String(data.status) : "waiting";
-    if (status === "started") {
-      // Evite boucle / double redirect
-      const target = `/vote/${sessionId}`;
-      if (window.location.pathname !== target) {
-        window.location.href = target;
-      }
+                    li.appendChild(img);
+                    li.appendChild(span);
+                    ul.appendChild(li);
+                });
+
+                if (data.status === 'started') {
+                    window.location.href = `/vote/${sessionId}`;
+                }
+            })
+            .catch(err => {
+                console.error(
+                    'Erreur lors du rafraîchissement des participants',
+                    err
+                );
+            });
     }
 
-    // Optionnel : si tu veux rediriger aussi en paused (pour voir l’état)
-    // if (status === "paused") window.location.href = `/vote/${sessionId}`;
-  }
-
-  /* ======================================================================== */
-  /* 2.4) Poll API                                                            */
-  /* ======================================================================== */
-
-  /**
-   * Poll /api/participants/<sessionId> et met à jour l'UI.
-   * @returns {void}
-   */
-/**
- * @brief Fonction `refreshParticipants`.
- *
- * @returns {*} 
- */
-  function refreshParticipants() {
-    fetch(`/api/participants/${sessionId}`, { cache: "no-store" })
-      .then((r) => r.json())
-      .then((/** @type {ParticipantsResponse} */ data) => {
-        renderParticipants(data);
-        maybeRedirectToVote(data);
-      })
-      .catch(() => {
-        // silence en prod
-      });
-  }
-
-  refreshParticipants();
-  setInterval(refreshParticipants, 2000); // un peu plus réactif que 3000
+    // ----------------------------------------------------------------
+    // Démarrage du polling
+    // ----------------------------------------------------------------
+    if (sessionId) {
+        refreshParticipants();
+        setInterval(refreshParticipants, 3000);
+    }
 });

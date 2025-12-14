@@ -1,12 +1,12 @@
 """
 @file app.py
-@brief Backend Flask de Planning Poker (gestion sessions, votes, chat, export/import).
+@brief Backend Flask de Planning Poker (sessions, votes, chat, export/import).
 @details
-- Rendu des pages HTML (create/join/waiting/vote)
-- API JSON de polling (participants, game state) et actions (resume, next_story, revote)
-- Export/Import d'état de partie
-- Persistance via Google Firestore
+- Pages HTML: /, /create, /join, /waiting/<id>, /vote/<id>
+- API JSON: /api/game/<id>, /api/participants/<id>, /api/chat/<id>, ...
+- Persistance: Firestore (sessions + sous-collections participants/chat)
 """
+
 
 from flask import (
     Flask, render_template, request, redirect,
