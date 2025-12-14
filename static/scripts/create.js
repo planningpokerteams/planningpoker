@@ -30,30 +30,30 @@ document.addEventListener("DOMContentLoaded", () => {
   // 1) Récupération des éléments DOM (formulaire + liste des US)
   // ---------------------------------------------------------------------------
 
-  /** @type {HTMLButtonElement|null} Bouton “Ajouter” une US */
-  const addBtn = document.getElementById("add-story-btn");
+  /** @type {HTMLButtonElement|null} */
+  const addBtn = document.getElementById("add-story-btn"); // Bouton “Ajouter” une US
 
-  /** @type {HTMLElement|null} Liste visuelle des US (les “cartes” affichées) */
-  const storiesListEl = document.getElementById("stories-list");
+  /** @type {HTMLElement|null} */
+  const storiesListEl = document.getElementById("stories-list"); // Liste visuelle des US
 
-  /** @type {HTMLElement|null} Conteneur qui recevra les <input type="hidden"> */
-  const storiesHidden = document.getElementById("stories-hidden");
+  /** @type {HTMLElement|null} */
+  const storiesHidden = document.getElementById("stories-hidden"); // Conteneur des <input type="hidden">
 
-  /** @type {HTMLInputElement|null} Champ texte pour saisir une nouvelle US */
-  const inputStory = document.getElementById("userStories-input");
+  /** @type {HTMLInputElement|null} */
+  const inputStory = document.getElementById("userStories-input"); // Champ texte US
 
-  /** @type {HTMLFormElement|null} Formulaire complet “Créer” */
-  const form = document.getElementById("create-form");
+  /** @type {HTMLFormElement|null} */
+  const form = document.getElementById("create-form"); // Formulaire “Créer”
 
   // ---------------------------------------------------------------------------
   // 2) Gestion “Mode de jeu” : texte explicatif qui change selon le <select>
   // ---------------------------------------------------------------------------
 
-  /** @type {HTMLSelectElement|null} Select du mode de jeu */
-  const modeSelect = document.getElementById("game_mode");
+  /** @type {HTMLSelectElement|null} */
+  const modeSelect = document.getElementById("game_mode"); // Select du mode de jeu
 
-  /** @type {HTMLElement|null} Paragraphe qui affiche la description du mode */
-  const modeDesc = document.getElementById("mode-description");
+  /** @type {HTMLElement|null} */
+  const modeDesc = document.getElementById("mode-description"); // Zone texte description
 
   /**
    * Met à jour le texte de description en fonction de la valeur du select.
@@ -75,11 +75,11 @@ document.addEventListener("DOMContentLoaded", () => {
   // 3) Gestion de la liste des User Stories : ajout + rendu + drag & drop
   // ---------------------------------------------------------------------------
 
-  /** @type {string[]} Tableau en mémoire : les US dans l'ordre courant */
-  let stories = [];
+  /** @type {string[]} */
+  let stories = []; // Les US dans l'ordre courant
 
-  /** @type {number|null} Index de la carte actuellement “dragguée” */
-  let draggedIndex = null;
+  /** @type {number|null} */
+  let draggedIndex = null; // Index de la carte en cours de drag
 
   /**
    * Ré-affiche entièrement la liste des US à partir du tableau `stories`.
@@ -97,30 +97,29 @@ document.addEventListener("DOMContentLoaded", () => {
       item.draggable = true;
       item.dataset.index = String(index);
 
-      // Contenu visuel : numéro + texte
       item.innerHTML = `
         <span class="story-index">US ${index + 1}</span>
         <span class="story-text">${text}</span>
       `;
 
-      // --- Drag start : mémorise l'index d'origine
+      // Drag start : mémorise l'index d'origine
       item.addEventListener("dragstart", (e) => {
         draggedIndex = index;
         if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
       });
 
-      // --- Drag over : autorise le drop + met un style de survol
+      // Drag over : autorise le drop + style survol
       item.addEventListener("dragover", (e) => {
         e.preventDefault();
         item.classList.add("story-item--dragover");
       });
 
-      // --- Drag leave : retire le style de survol
+      // Drag leave : retire le style survol
       item.addEventListener("dragleave", () => {
         item.classList.remove("story-item--dragover");
       });
 
-      // --- Drop : réordonne le tableau puis re-render
+      // Drop : réordonne le tableau puis re-render
       item.addEventListener("drop", (e) => {
         e.preventDefault();
         item.classList.remove("story-item--dragover");
@@ -129,7 +128,6 @@ document.addEventListener("DOMContentLoaded", () => {
         const targetIndex = index;
         if (targetIndex === draggedIndex) return;
 
-        // Retire l’élément déplacé puis le réinsère à la nouvelle position
         const moved = stories.splice(draggedIndex, 1)[0];
         stories.splice(targetIndex, 0, moved);
 
@@ -155,10 +153,10 @@ document.addEventListener("DOMContentLoaded", () => {
     renderStories();
   }
 
-  // --- Ajout via clic sur le bouton “Ajouter”
+  // Ajout via clic sur le bouton
   if (addBtn) addBtn.addEventListener("click", addStoryFromInput);
 
-  // --- Ajout rapide via Entrée dans le champ texte
+  // Ajout via Entrée
   if (inputStory) {
     inputStory.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
@@ -177,7 +175,7 @@ document.addEventListener("DOMContentLoaded", () => {
       // Si une US est encore dans le champ texte, on l'ajoute d'abord
       if (inputStory && inputStory.value.trim()) addStoryFromInput();
 
-      // Sécurité : si on n'a pas le conteneur hidden, on bloque (sinon backend vide)
+      // Sécurité : si on n'a pas le conteneur hidden, on bloque
       if (!storiesHidden) {
         e.preventDefault();
         alert("Erreur : conteneur des user stories introuvable.");
@@ -194,7 +192,7 @@ document.addEventListener("DOMContentLoaded", () => {
         storiesHidden.appendChild(inp);
       });
 
-      // Validation : au moins une US est requise
+      // Validation : au moins une US
       if (stories.length === 0) {
         e.preventDefault();
         alert("Ajoute au moins une user story avant de créer la session.");

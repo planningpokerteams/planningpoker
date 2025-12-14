@@ -32,6 +32,13 @@
  */
 
 /**
+ * Statuts possibles d'une session.
+ * (On le sépare de GameState pour éviter les syntaxes TS du type GameState["status"],
+ * que JSDoc ne sait pas parser.)
+ * @typedef {"waiting"|"started"|"paused"|"finished"} GameStatus
+ */
+
+/**
  * @typedef {Object} Participant
  * @property {string} name
  * @property {string} avatarSeed
@@ -55,7 +62,7 @@
 
 /**
  * @typedef {Object} GameState
- * @property {string} status                 - "waiting" | "started" | "paused" | "finished"
+ * @property {GameStatus} status
  * @property {string} gameMode               - "strict" | "average" | "median" | "abs" | "rel"
  * @property {number} roundNumber
  * @property {string|null} currentStory
@@ -89,58 +96,58 @@ const { sessionId, currentUser, isOrganizer } = window.GAME_CONFIG || {};
 /* 3) Sélection des éléments DOM                                              */
 /* ========================================================================== */
 
-const cards        = document.querySelectorAll(".poker-card");
-const voteInput    = document.getElementById("vote-input");
-const voteForm     = document.getElementById("vote-form");
+const cards = document.querySelectorAll(".poker-card");
+const voteInput = document.getElementById("vote-input");
+const voteForm = document.getElementById("vote-form");
 
-const storyTextEl  = document.getElementById("story-text");
-const roundInfoEl  = document.getElementById("round-info");
-const pokerTable   = document.getElementById("poker-table");
-const tableStatus  = document.getElementById("table-status-text");
+const storyTextEl = document.getElementById("story-text");
+const roundInfoEl = document.getElementById("round-info");
+const pokerTable = document.getElementById("poker-table");
+const tableStatus = document.getElementById("table-status-text");
 
 const revealButton = document.getElementById("reveal-button");
-const revealHint   = document.getElementById("reveal-hint");
+const revealHint = document.getElementById("reveal-hint");
 
-const nextBtn      = document.getElementById("next-button");
-const revoteBtn    = document.getElementById("revote-button");
+const nextBtn = document.getElementById("next-button");
+const revoteBtn = document.getElementById("revote-button");
 const forceNextBtn = document.getElementById("force-next-button");
-const resumeBtn    = document.getElementById("resume-button");
+const resumeBtn = document.getElementById("resume-button");
 
-const historyList    = document.getElementById("history-list");
-const storyTimerEl   = document.getElementById("story-timer");
+const historyList = document.getElementById("history-list");
+const storyTimerEl = document.getElementById("story-timer");
 const gameStatusText = document.getElementById("game-status-text");
 
-const exportBtn    = document.getElementById("export-button");
+const exportBtn = document.getElementById("export-button");
 
-const chatButton   = document.getElementById("chat-button");
-const chatPanel    = document.getElementById("chat-panel");
+const chatButton = document.getElementById("chat-button");
+const chatPanel = document.getElementById("chat-panel");
 const chatMessages = document.getElementById("chat-messages");
-const chatInput    = document.getElementById("chat-input");
-const chatSend     = document.getElementById("chat-send");
+const chatInput = document.getElementById("chat-input");
+const chatSend = document.getElementById("chat-send");
 
 /* ========================================================================== */
 /* 4) État local côté client                                                  */
 /* ========================================================================== */
 
-/** @type {number|string|null} Dernière estimation calculée pour la story */
+/** @type {number|string|null} */
 let lastComputedResult = null;
 
-/** @type {string} Mode de calcul courant */
+/** @type {string} */
 let lastGameMode = "strict";
 
-/** @type {number} Numéro de tour pour la story en cours */
+/** @type {number} */
 let lastRoundNumber = 1;
 
-/** @type {number} Durée de la story (secondes) */
+/** @type {number} */
 let timerPerStorySeconds = 0;
 
-/** @type {number|null} Timestamp de départ du timer (secondes) côté serveur */
+/** @type {number|null} */
 let timerStartTimestamp = null;
 
-/** @type {GameState["status"]} */
+/** @type {GameStatus} */
 let lastStatus = "waiting";
 
-/** @type {boolean} Anti-double appel /next_story à la fin du timer */
+/** @type {boolean} */
 let timeExpiredHandled = false;
 
 /* ========================================================================== */
@@ -185,7 +192,7 @@ function layoutSeats() {
 }
 
 /* ========================================================================== */
-/* 6) Vote — clic sur une carte                                                */
+/* 6) Vote — clic sur une carte                                               */
 /* ========================================================================== */
 
 cards.forEach((card) => {
@@ -281,7 +288,7 @@ function computeCounts(votes) {
 }
 
 /* ========================================================================== */
-/* 8) Timer (affichage côté client)                                            */
+/* 8) Timer (affichage côté client)                                           */
 /* ========================================================================== */
 
 /**
@@ -345,7 +352,7 @@ function tickStoryTimer() {
 setInterval(tickStoryTimer, 1000);
 
 /* ========================================================================== */
-/* 9) Rafraîchissement de l'état de partie                                     */
+/* 9) Rafraîchissement de l'état de partie                                    */
 /* ========================================================================== */
 
 /**
@@ -389,14 +396,16 @@ function refreshGameState() {
         gameStatusText.textContent = "";
       }
 
-      // ---- 4) Historique
+      // -------------------------------
+      // Affichage de l’historique
+      // -------------------------------
       if (historyList) {
         historyList.innerHTML = "";
         (data.history || []).forEach((entry) => {
           const li = document.createElement("li");
           li.className = "history-item";
-
           const votes = entry.votes || [];
+
           const votesHtml = votes
             .map(
               (v) => `
@@ -424,7 +433,9 @@ function refreshGameState() {
         });
       }
 
-      // ---- 5) Joueurs autour de la table
+      // -------------------------------
+      // Affichage des joueurs autour de la table
+      // -------------------------------
       if (pokerTable) {
         pokerTable.querySelectorAll(".player-seat").forEach((n) => n.remove());
 
@@ -463,7 +474,9 @@ function refreshGameState() {
 
         layoutSeats();
 
-        // ---- 6) Pause café
+        // -------------------------------
+        // Gestion de la pause café
+        // -------------------------------
         if (data.status === "paused" && data.allCafe) {
           setCardsEnabled(false);
           if (tableStatus) tableStatus.textContent = "☕ Une pause s'impose !";
@@ -482,7 +495,6 @@ function refreshGameState() {
           if (chatButton) chatButton.style.display = "none";
           if (forceNextBtn) forceNextBtn.style.display = "none";
 
-          // On fige l'affichage timer côté client
           timerPerStorySeconds = 0;
           timerStartTimestamp = null;
           return;
@@ -491,7 +503,9 @@ function refreshGameState() {
           if (exportBtn) exportBtn.style.display = "none";
         }
 
-        // ---- 7) Fin de partie
+        // -------------------------------
+        // Gestion de la fin de partie
+        // -------------------------------
         if (data.status === "finished") {
           setCardsEnabled(false);
 
@@ -516,10 +530,12 @@ function refreshGameState() {
           return;
         }
 
-        // ---- 8) Partie en cours (non pause)
+        // -------------------------------
+        // Partie en cours (non en pause)
+        // -------------------------------
         setCardsEnabled(true);
 
-        // ===== AVANT révélation =====
+        // ---------- Avant révélation des cartes ----------
         if (!data.reveal) {
           lastComputedResult = null;
 
@@ -547,7 +563,8 @@ function refreshGameState() {
             if (data.allVoted) {
               revealButton.style.display = "inline-block";
               revealButton.disabled = false;
-              revealHint.textContent = "Tout le monde a voté, tu peux révéler les cartes.";
+              revealHint.textContent =
+                "Tout le monde a voté, tu peux révéler les cartes.";
             } else {
               revealButton.style.display = "none";
               revealHint.textContent = "En attente des votes…";
@@ -561,7 +578,7 @@ function refreshGameState() {
           return;
         }
 
-        // ===== APRÈS révélation =====
+        // ---------- Après révélation des cartes ----------
         const allVotesCount = (data.participants || []).length;
         const rawVotes = (data.participants || []).map((p) => p.vote);
         const numericVotes = rawVotes
@@ -588,14 +605,15 @@ function refreshGameState() {
         if (revealButton) revealButton.style.display = "none";
         if (revealHint) revealHint.textContent = "Les cartes sont révélées.";
 
-        // ----- Mode strict : unanimité obligatoire -----
+        // ----- Mode strict (unanimité requise) -----
         if (isStrictTurn) {
           if (unanimity && numericVotes.length) {
             const val = numericVotes[0];
             lastComputedResult = val;
 
             if (tableStatus) {
-              tableStatus.textContent = `✅ Unanimité atteinte (mode strict) : ${val}`;
+              tableStatus.textContent =
+                `✅ Unanimité atteinte (mode strict) : ${val}`;
             }
 
             if (isOrganizer && nextBtn) nextBtn.style.display = "block";
@@ -617,7 +635,7 @@ function refreshGameState() {
           return;
         }
 
-        // ----- Modes automatiques : moyenne / médiane / majorités -----
+        // ----- Modes automatiques (moyenne, médiane, majorités) -----
         if (!numericVotes.length) {
           lastComputedResult = null;
 
@@ -664,9 +682,11 @@ function refreshGameState() {
 
           if (bestVal !== null && bestCount > allVotesCount / 2) {
             result = bestVal;
-            message = `Valeur ${bestVal} choisie par ${bestCount}/${allVotesCount} joueurs.`;
+            message =
+              `Valeur ${bestVal} choisie par ${bestCount}/${allVotesCount} joueurs.`;
           } else {
-            message = "Pas de majorité absolue claire. Discutez et revotez si besoin.";
+            message =
+              "Pas de majorité absolue claire. Discutez et revotez si besoin.";
           }
         } else if (lastGameMode === "rel") {
           label = "Majorité relative";
@@ -689,9 +709,11 @@ function refreshGameState() {
 
           if (bestVal !== null && !tie) {
             result = bestVal;
-            message = `Valeur ${bestVal} majoritaire (${bestCount}/${allVotesCount} votes).`;
+            message =
+              `Valeur ${bestVal} majoritaire (${bestCount}/${allVotesCount} votes).`;
           } else {
-            message = "Pas de majorité relative claire (égalité). Discutez et revotez si besoin.";
+            message =
+              "Pas de majorité relative claire (égalité). Discutez et revotez si besoin.";
           }
         }
 

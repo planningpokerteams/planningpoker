@@ -17,7 +17,7 @@ const CARDS = [0, 0.5, 1, 2, 3, 5, 8, 13, 20, 40, 100];
 /**
  * Trouve la carte Planning Poker la plus proche de `value`.
  * @param {number} value - Valeur cible (moyenne/médiane/etc.).
- * @returns {number|null} Carte la plus proche, ou null si `value` n'est pas un nombre.
+ * @returns {(number|null)} Carte la plus proche, ou null si `value` n'est pas un nombre.
  */
 function nearestCard(value) {
   if (typeof value !== "number" || Number.isNaN(value)) return null;
@@ -38,7 +38,7 @@ function nearestCard(value) {
 /**
  * Calcule la moyenne des votes numériques et la carte la plus proche.
  * @param {number[]} votes - Liste de votes (ex: [1, 2, 3]).
- * @returns {{avg:number, card:number|null}} Résultat (moyenne + carte la plus proche).
+ * @returns {{avg:number, card:(number|null)}} Résultat (moyenne + carte la plus proche).
  */
 function computeAverage(votes) {
   const sum = votes.reduce((a, b) => a + b, 0);
@@ -49,7 +49,7 @@ function computeAverage(votes) {
 /**
  * Calcule la médiane des votes numériques et la carte la plus proche.
  * @param {number[]} votes - Liste de votes (ex: [1, 2, 3]).
- * @returns {{median:number, card:number|null}} Résultat (médiane + carte la plus proche).
+ * @returns {{median:number, card:(number|null)}} Résultat (médiane + carte la plus proche).
  */
 function computeMedian(votes) {
   const sorted = [...votes].sort((a, b) => a - b);
